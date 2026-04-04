@@ -66,6 +66,14 @@ app.use('/api/elections', electionRoutes);
 initWebSocket(io);
 
 // Error handling
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Server error:', err.message);
   res.status(500).json({ error: 'Internal server error' });
@@ -83,6 +91,10 @@ connectDB().then(async () => {
     console.log(`📡 WebSocket server active`);
     console.log(`🗄️  Database: MongoDB Atlas`);
   });
+}).catch(err => {
+  console.error('🚨 FAILED TO CONNECT TO MONGODB ATLAS ON STARTUP:');
+  console.error(err);
+  process.exit(1);
 });
 
 export { app, io };
