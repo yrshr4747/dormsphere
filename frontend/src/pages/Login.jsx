@@ -103,21 +103,22 @@ export default function Login() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="glass-card-static animate-slide-up" style={{ width: '100%', maxWidth: 440 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-2xl) 0', background: 'var(--bg-secondary)' }}>
+      <div className="glass-card-static animate-slide-up" style={{ width: '100%', maxWidth: 440, padding: '2.5rem' }}>
         {/* Header */}
-        <div className="text-center mb-xl">
+        <div className="text-center mb-xl" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem' }}>
           <div style={{
-            width: 64, height: 64, margin: '0 auto var(--space-lg)',
-            background: 'linear-gradient(135deg, var(--cardinal) 0%, var(--cardinal-light) 100%)',
-            borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: '1.8rem',
+            width: 56, height: 56, margin: '0 auto var(--space-md)',
+            background: 'var(--sapphire)', color: '#FFFFFF',
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: '1.5rem',
+            boxShadow: 'var(--shadow-sm)'
           }}>
             🏛️
           </div>
-          <h1 style={{ fontSize: '1.75rem', marginBottom: 'var(--space-xs)' }}>DormSphere</h1>
-          <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-            IIITK Hostel Management Platform
+          <h1 style={{ fontSize: '1.75rem', marginBottom: 'var(--space-xs)', color: 'var(--sapphire)' }}>DormSphere</h1>
+          <p className="text-muted" style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>
+            IIITK Residence Portal
           </p>
         </div>
 
@@ -125,28 +126,27 @@ export default function Login() {
         {mode === 'otp' ? (
           <div>
             <div className="text-center mb-lg">
-              <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-sm)' }}>📧</div>
-              <h3>Verify Your Email</h3>
-              <p className="text-muted mt-sm" style={{ fontSize: '0.85rem' }}>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Verify Your Email</h3>
+              <p className="text-muted mt-sm" style={{ fontSize: '0.9rem' }}>
                 Enter the 6-digit code sent to<br />
-                <strong style={{ color: 'var(--cardinal-light)' }}>{otpEmail}</strong>
+                <strong style={{ color: 'var(--text-main)' }}>{otpEmail}</strong>
               </p>
             </div>
 
             {error && (
               <div style={{
-                background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)',
-                borderRadius: 'var(--radius-md)', padding: 'var(--space-md)',
-                marginBottom: 'var(--space-lg)', color: 'var(--danger)', fontSize: '0.85rem',
+                background: '#FFF5F5', border: '1px solid #FC8181',
+                padding: '1rem', marginBottom: 'var(--space-lg)', color: '#C53030', fontSize: '0.85rem',
+                fontWeight: 500
               }}>
                 {error}
               </div>
             )}
             {success && (
               <div style={{
-                background: 'rgba(45,138,78,0.1)', border: '1px solid rgba(45,138,78,0.3)',
-                borderRadius: 'var(--radius-md)', padding: 'var(--space-md)',
-                marginBottom: 'var(--space-lg)', color: 'var(--success-light)', fontSize: '0.85rem',
+                background: '#F0FFF4', border: '1px solid #68D391',
+                padding: '1rem', marginBottom: 'var(--space-lg)', color: '#2F855A', fontSize: '0.85rem',
+                fontWeight: 500
               }}>
                 {success}
               </div>
@@ -168,8 +168,8 @@ export default function Login() {
                 />
               </div>
 
-              <button className="btn btn-cardinal btn-lg w-full" type="submit" disabled={loading || otp.length !== 6}>
-                {loading ? <div className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} /> : '✅ Verify & Create Account'}
+              <button className="btn btn-primary btn-lg w-full" type="submit" disabled={loading || otp.length !== 6}>
+                {loading ? <div className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} /> : 'Verify & Create Account'}
               </button>
             </form>
 
@@ -178,36 +178,36 @@ export default function Login() {
                 className="btn btn-ghost btn-sm"
                 onClick={() => { setMode('register'); setError(''); setSuccess(''); }}
               >
-                ← Back
+                Go Back
               </button>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={handleResendOTP}
                 disabled={resendCooldown > 0}
               >
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : '🔄 Resend OTP'}
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
               </button>
             </div>
 
-            <p className="text-center text-muted mt-lg" style={{ fontSize: '0.7rem' }}>
-              Code expires in 10 minutes • Max 5 attempts
+            <p className="text-center text-muted mt-lg" style={{ fontSize: '0.75rem' }}>
+              Code expires in 10 minutes
             </p>
           </div>
         ) : (
           /* Login / Register View */
           <div>
             {/* Toggle */}
-            <div className="flex gap-sm mb-lg" style={{ background: 'rgba(15,14,13,0.4)', borderRadius: 'var(--radius-md)', padding: '4px' }}>
+            <div className="flex mb-lg" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
               <button
-                className={`btn btn-sm w-full ${mode === 'login' ? 'btn-cardinal' : 'btn-ghost'}`}
-                style={{ border: 'none' }}
+                className={`btn w-full ${mode === 'login' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ border: 'none', borderRadius: 0, shadow: 'none' }}
                 onClick={() => { setMode('login'); setError(''); }}
               >
                 Sign In
               </button>
               <button
-                className={`btn btn-sm w-full ${mode === 'register' ? 'btn-cardinal' : 'btn-ghost'}`}
-                style={{ border: 'none' }}
+                className={`btn w-full ${mode === 'register' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ border: 'none', borderRadius: 0, shadow: 'none' }}
                 onClick={() => { setMode('register'); setError(''); }}
               >
                 Register
@@ -216,9 +216,9 @@ export default function Login() {
 
             {error && (
               <div style={{
-                background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)',
-                borderRadius: 'var(--radius-md)', padding: 'var(--space-md)',
-                marginBottom: 'var(--space-lg)', color: 'var(--danger)', fontSize: '0.85rem',
+                background: '#FFF5F5', border: '1px solid #FC8181',
+                padding: '1rem', marginBottom: 'var(--space-lg)', color: '#C53030', fontSize: '0.85rem',
+                fontWeight: 500
               }}>
                 {error}
               </div>
@@ -234,7 +234,7 @@ export default function Login() {
                   <div className="form-group">
                     <label className="form-label">Roll Number</label>
                     <input className="form-input" type="text" placeholder="123CS0076" value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value.toUpperCase() })} required />
-                    <span style={{ fontSize: '0.7rem', color: 'var(--light-gray)', marginTop: '4px' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                       Format: 123CS0076 (B.Tech) or 523CS0001 (Dual Degree)
                     </span>
                   </div>
@@ -261,11 +261,11 @@ export default function Login() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">Program</label>
-                    <div className="flex gap-sm">
-                      <button type="button" className={`btn btn-sm w-full ${form.program === 'btech' ? 'btn-cardinal' : 'btn-ghost'}`} onClick={() => setForm({ ...form, program: 'btech' })}>
+                    <div className="flex">
+                      <button type="button" className={`btn w-full ${form.program === 'btech' ? 'btn-primary' : 'btn-ghost'}`} style={{ borderRadius: 0 }} onClick={() => setForm({ ...form, program: 'btech' })}>
                         B.Tech
                       </button>
-                      <button type="button" className={`btn btn-sm w-full ${form.program === 'dual' ? 'btn-cardinal' : 'btn-ghost'}`} onClick={() => setForm({ ...form, program: 'dual' })} disabled={form.department === 'AD'}>
+                      <button type="button" className={`btn w-full ${form.program === 'dual' ? 'btn-primary' : 'btn-ghost'}`} style={{ borderRadius: 0 }} onClick={() => setForm({ ...form, program: 'dual' })} disabled={form.department === 'AD'}>
                         Dual Degree
                       </button>
                     </div>
@@ -280,7 +280,7 @@ export default function Login() {
                 <label className="form-label">Email</label>
                 <input className="form-input" id="login-email" type="email" placeholder="student@iiitk.ac.in" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
                 {mode === 'register' && (
-                  <span style={{ fontSize: '0.7rem', color: 'var(--light-gray)', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                     Only @iiitk.ac.in emails are allowed
                   </span>
                 )}
@@ -291,16 +291,16 @@ export default function Login() {
                 <input className="form-input" id="login-password" type="password" placeholder="••••••••" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
               </div>
 
-              <button className="btn btn-cardinal btn-lg w-full" id="login-submit" type="submit" disabled={loading} style={{ marginTop: 'var(--space-md)' }}>
+              <button className="btn btn-primary btn-lg w-full" id="login-submit" type="submit" disabled={loading} style={{ marginTop: 'var(--space-md)' }}>
                 {loading
                   ? <div className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
-                  : mode === 'register' ? '📧 Send Verification OTP' : 'Sign In'
+                  : mode === 'register' ? 'Send Verification Code' : 'Sign In'
                 }
               </button>
             </form>
 
-            <p className="text-center text-muted mt-lg" style={{ fontSize: '0.8rem' }}>
-              Secured with JWT • AES-256 Vault • OTP Verified
+            <p className="text-center text-muted mt-xl" style={{ fontSize: '0.8rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+              Authorized Access Only
             </p>
           </div>
         )}

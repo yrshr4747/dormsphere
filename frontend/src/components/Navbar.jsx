@@ -12,43 +12,55 @@ export default function Navbar() {
   };
 
   const links = [
-    { to: '/', label: 'Dashboard', icon: '🏠' },
-    { to: '/rooms', label: 'Rooms', icon: '🏢' },
-    { to: '/survey', label: 'Survey', icon: '📋' },
-    { to: '/outpass', label: 'Outpass', icon: '🎫' },
-    { to: '/media', label: 'Media', icon: '📸' },
-    { to: '/elections', label: 'Elections', icon: '🗳️' },
+    { to: '/', label: 'Dashboard' },
+    { to: '/rooms', label: 'Housing Options' },
+    { to: '/survey', label: 'Room Assessment' },
+    { to: '/outpass', label: 'Outpass Services' },
+    { to: '/media', label: 'Media Portal' },
+    { to: '/elections', label: 'Student Elections' },
   ];
 
   return (
-    <nav className="navbar">
-      <Link to="/" className="navbar-brand">
-        <div className="navbar-brand-icon">🏛️</div>
-        DormSphere
-      </Link>
+    <header>
+      {/* Top Utility Bar - Crisp White */}
+      <div style={{ background: '#FFFFFF', padding: '16px 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none' }}>
+          <div className="navbar-brand-icon" style={{ background: 'var(--sapphire)', color: 'white', border: 'none', borderRadius: '4px' }}>🏛️</div>
+          <div>
+            <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--sapphire)', fontFamily: 'var(--font-serif)', fontWeight: 700 }}>IIITDM Kurnool</h1>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: 'var(--font-primary)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700 }}>DormSphere Residence</div>
+          </div>
+        </Link>
 
-      <ul className="navbar-links">
-        {links.map((link) => (
-          <li key={link.to}>
-            <Link
-              to={link.to}
-              className={`navbar-link ${location.pathname === link.to ? 'active' : ''}`}
-            >
-              {link.icon} {link.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      <div className="flex items-center gap-md">
-        <span className="badge badge-gold">{user.role || 'student'}</span>
-        <span style={{ fontSize: '0.85rem', color: 'var(--light-gray)' }}>
-          {user.name || 'User'}
-        </span>
-        <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
-          Logout
-        </button>
+        {user.name && (
+          <div className="flex items-center gap-md">
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: 700 }}>{user.name}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user.role === 'admin' ? 'Administrator' : 'Student'}</div>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={handleLogout} style={{ borderRadius: 0, padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>
+              Logout
+            </button>
+          </div>
+        )}
       </div>
-    </nav>
+
+      {/* Primary Navigation - Sapphire Blue */}
+      <nav className="navbar" style={{ height: 'auto', minHeight: '54px', padding: '0', display: 'flex', justifyContent: 'center' }}>
+        <ul className="navbar-links" style={{ margin: 0, padding: 0, flexWrap: 'wrap', justifyContent: 'center' }}>
+          {links.map((link) => (
+            <li key={link.to}>
+              <Link
+                to={link.to}
+                className={`navbar-link ${location.pathname === link.to ? 'active' : ''}`}
+                style={{ display: 'block', padding: '1rem 1.25rem', letterSpacing: '0.05em' }}
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </header>
   );
 }
