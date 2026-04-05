@@ -1,38 +1,31 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'DormSphere <onboarding@resend.dev>';
 
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: SMTP_PORT === 465,
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS,
-  },
-});
+let resend: Resend | null = null;
+if (RESEND_API_KEY) {
+  resend = new Resend(RESEND_API_KEY);
+}
 
 export function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export async function sendOTP(email: string, otp: string): Promise<boolean> {
-  // Dev fallback: if no SMTP configured, log to console
-  if (!SMTP_USER || !SMTP_PASS) {
+  // Dev fallback: if no Resend API key configured, log to console
+  if (!resend) {
     console.log(`\n📧 ═══════════════════════════════════════`);
     console.log(`   OTP for ${email}: ${otp}`);
-    console.log(`   (SMTP not configured — logging to console)`);
+    console.log(`   (RESEND_API_KEY not configured — logging to console)`);
     console.log(`═══════════════════════════════════════════\n`);
     return true;
   }
 
   try {
-    await transporter.sendMail({
-      from: `"DormSphere" <${SMTP_USER}>`,
-      to: email,
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: [email],
       subject: '🏛️ DormSphere — Email Verification OTP',
       html: `
         <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #1A1918; color: #F2F1EB; border-radius: 16px;">
@@ -52,7 +45,14 @@ export async function sendOTP(email: string, otp: string): Promise<boolean> {
         </div>
       `,
     });
-    console.log(`📧 OTP sent to ${email}`);
+
+    if (error) {
+      console.error('Resend email error:', error);
+      console.log(`\n📧 OTP for ${email}: ${otp} (email send failed, logged here)\n`);
+      return true;
+    }
+
+    console.log(`📧 OTP sent to ${email} (Resend ID: ${data?.id})`);
     return true;
   } catch (error) {
     console.error('Email send error:', error);

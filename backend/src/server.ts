@@ -23,17 +23,30 @@ import electionRoutes from './routes/elections';
 const app = express();
 const server = http.createServer(app);
 
+// Build allowed origins list from FRONTEND_URL (comma-separated) + localhost
+const allowedOrigins: string[] = [];
+if (process.env.FRONTEND_URL) {
+  process.env.FRONTEND_URL.split(',').forEach(u => allowedOrigins.push(u.trim()));
+}
+if (!allowedOrigins.length) {
+  allowedOrigins.push('http://localhost:5173');
+}
+// Always allow localhost for dev
+if (!allowedOrigins.includes('http://localhost:5173')) {
+  allowedOrigins.push('http://localhost:5173');
+}
+
 // Socket.io setup
 const io = new SocketServer(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
   },
 });
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: allowedOrigins,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
