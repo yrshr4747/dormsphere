@@ -24,29 +24,36 @@ const app = express();
 const server = http.createServer(app);
 
 // Build allowed origins list from FRONTEND_URL (comma-separated) + localhost
-const allowedOrigins: string[] = [];
+const allowedOrigins: string[] = ['http://localhost:5173'];
 if (process.env.FRONTEND_URL) {
-  process.env.FRONTEND_URL.split(',').forEach(u => allowedOrigins.push(u.trim()));
+  process.env.FRONTEND_URL.split(',').forEach(u => {
+    const trimmed = u.trim();
+    if (trimmed && !allowedOrigins.includes(trimmed)) allowedOrigins.push(trimmed);
+  });
 }
-if (!allowedOrigins.length) {
-  allowedOrigins.push('http://localhost:5173');
-}
-// Always allow localhost for dev
-if (!allowedOrigins.includes('http://localhost:5173')) {
-  allowedOrigins.push('http://localhost:5173');
+
+// Dynamic origin checker: allows explicit origins + any *.vercel.app subdomain
+function checkOrigin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+  // Allow requests with no origin (e.g. server-to-server, curl)
+  if (!origin) return callback(null, true);
+  // Allow any Vercel preview/production URL
+  if (origin.endsWith('.vercel.app')) return callback(null, true);
+  // Allow explicitly listed origins
+  if (allowedOrigins.includes(origin)) return callback(null, true);
+  callback(new Error('Not allowed by CORS'));
 }
 
 // Socket.io setup
 const io = new SocketServer(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: checkOrigin,
     methods: ['GET', 'POST'],
   },
 });
 
 // Middleware
 app.use(cors({
-  origin: allowedOrigins,
+  origin: checkOrigin,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
