@@ -7,6 +7,7 @@ import Survey from './pages/Survey';
 import Outpass from './pages/Outpass';
 import MediaPortal from './pages/MediaPortal';
 import Elections from './pages/Elections';
+import MVHRHostel from './pages/MVHRHostel';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('dormsphere_token');
@@ -19,6 +20,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Isolated route for MVHR so it can optionally ignore the dark mode Navbar if desired, but we'll include it here inside ProtectedRoute */}
         <Route
           path="/*"
           element={
@@ -32,6 +34,7 @@ export default function App() {
                   <Route path="/outpass" element={<Outpass />} />
                   <Route path="/media" element={<MediaPortal />} />
                   <Route path="/elections" element={<Elections />} />
+                  <Route path="/hostels/mvhr" element={<MVHRHostel />} />
                 </Routes>
               </div>
             </ProtectedRoute>

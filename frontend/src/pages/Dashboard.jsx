@@ -188,7 +188,13 @@ export default function Dashboard() {
                 background: 'rgba(15,14,13,0.4)', border: '1px solid var(--border)',
               }}>
                 <h4 style={{ fontSize: '0.9rem', marginBottom: 'var(--space-sm)' }}>
-                  {block.hostel_name}
+                  {block.hostel_name.includes('MVHR') ? (
+                    <Link to="/hostels/mvhr" className="text-cardinal" style={{ textDecoration: 'none' }}>
+                      {block.hostel_name} <span style={{ fontSize: '0.7rem' }}>ℹ️</span>
+                    </Link>
+                  ) : (
+                    block.hostel_name
+                  )}
                 </h4>
                 <div className="flex items-center gap-sm mb-sm">
                   <span>📶</span>
