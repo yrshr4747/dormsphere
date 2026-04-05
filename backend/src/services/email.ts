@@ -5,10 +5,13 @@ const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465');
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 
+// If we provide a Google Apps Script webhook, we'll use that instead of SMTP
+const APPS_SCRIPT_WEBHOOK = process.env.APPS_SCRIPT_WEBHOOK || '';
+
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
-  secure: true, // use SSL on port 465
+  secure: true,
   auth: {
     user: SMTP_USER,
     pass: SMTP_PASS,
@@ -23,11 +26,30 @@ export function generateOTP(): string {
 }
 
 export async function sendOTP(email: string, otp: string): Promise<boolean> {
+  // Use Apps Script Webhook if available (Bypasses Render's SMTP block)
+  if (APPS_SCRIPT_WEBHOOK) {
+    try {
+      const response = await fetch(APPS_SCRIPT_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      
+      if (!response.ok) throw new Error(`Webhook failed: ${response.statusText}`);
+      console.log(`📧 OTP sent to ${email} via Webhook`);
+      return true;
+    } catch (error) {
+      console.error('Webhook send error:', error);
+      console.log(`\n📧 OTP for ${email}: ${otp} (webhook failed, logged here)\n`);
+      return true;
+    }
+  }
+
   // Dev fallback: if no SMTP configured, log to console
   if (!SMTP_USER || !SMTP_PASS) {
     console.log(`\n📧 ═══════════════════════════════════════`);
     console.log(`   OTP for ${email}: ${otp}`);
-    console.log(`   (SMTP not configured — logging to console)`);
+    console.log(`   (No Email Provider configured — logging to console)`);
     console.log(`═══════════════════════════════════════════\n`);
     return true;
   }
