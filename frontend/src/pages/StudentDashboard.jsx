@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import SettingsModal from '../components/SettingsModal';
 
 export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem('dormsphere_user') || '{}');
@@ -12,6 +13,7 @@ export default function Dashboard() {
   const [retention, setRetention] = useState(null);
   const [roommateStatus, setRoommateStatus] = useState(null);
   const [inviteRoll, setInviteRoll] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     Promise.allSettled([
@@ -53,15 +55,22 @@ export default function Dashboard() {
     <div className="page container">
       {/* Welcome Header */}
       <div className="mb-xl animate-slide-up flex items-center gap-md">
-        {user.profileImageUrl && (
+        {user.profileImageUrl ? (
           <img 
             src={user.profileImageUrl.startsWith('http') ? user.profileImageUrl : `${import.meta.env.VITE_API_URL || ''}${user.profileImageUrl}`} 
             alt="Profile" 
             style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--cardinal)' }}
           />
+        ) : (
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
+            {user.name?.[0]}
+          </div>
         )}
-        <div>
-          <h1>Welcome back, <span className="text-cardinal">{user.name || 'Student'}</span></h1>
+        <div style={{ flex: 1 }}>
+          <div className="flex justify-between items-center">
+            <h1>Welcome back, <span className="text-cardinal">{user.name || 'Student'}</span></h1>
+            <button className="btn btn-sm btn-ghost" onClick={() => setShowSettings(true)}>⚙️ Settings</button>
+          </div>
           <p className="text-muted mt-sm">
             {user.rollNumber} • {user.department} • Year {user.yearGroup || user.year || 1}
           </p>
@@ -318,6 +327,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {showSettings && <SettingsModal user={user} onClose={() => setShowSettings(false)} />}
     </div>
   );
 }

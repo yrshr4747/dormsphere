@@ -2,6 +2,9 @@ import { Router, Response } from 'express';
 import { query, withTransaction } from '../db/connection';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { vectorizeSurvey, calculateCompatibility } from '../services/vectorizer';
+import bcrypt from 'bcryptjs';
+import { upload } from '../middleware/upload';
+import { uploadToCloudinary } from '../services/cloudinary';
 
 const router = Router();
 
@@ -210,6 +213,47 @@ router.post('/retention', authenticate, authorize('student'), async (req: AuthRe
   } catch (err) {
     console.error('Retention post error:', err);
     res.status(500).json({ error: 'Failed to process retention.' });
+  }
+});
+
+// PUT /api/student/profile-image
+router.put('/profile-image', authenticate, upload.single('profileImage'), async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No image uploaded.' });
+      return;
+    }
+    const url = await uploadToCloudinary(req.file.buffer, 'dormsphere/profiles');
+    await query('UPDATE students SET profile_image_url = $1, updated_at = NOW() WHERE id = $2', [url, req.user!.id]);
+    res.json({ message: 'Profile image updated.', profileImageUrl: url });
+  } catch (err) {
+    console.error('Profile image update error:', err);
+    res.status(500).json({ error: 'Failed to update profile image.' });
+  }
+});
+
+// PUT /api/student/password
+router.put('/password', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+       res.status(400).json({ error: 'Missing current or new password.' });
+       return;
+    }
+
+    const { rows } = await query('SELECT password_hash FROM students WHERE id = $1', [req.user!.id]);
+    if (rows.length === 0) { res.status(404).json({ error: 'User not found.' }); return; }
+
+    const valid = await bcrypt.compare(currentPassword, rows[0].password_hash);
+    if (!valid) { res.status(401).json({ error: 'Current password is incorrect.' }); return; }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await query('UPDATE students SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, req.user!.id]);
+    
+    res.json({ message: 'Password updated successfully.' });
+  } catch (err) {
+    console.error('Password update error:', err);
+    res.status(500).json({ error: 'Failed to update password.' });
   }
 });
 

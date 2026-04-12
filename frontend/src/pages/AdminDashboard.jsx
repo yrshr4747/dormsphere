@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import SettingsModal from '../components/SettingsModal';
 
 export default function AdminDashboard() {
   const user = JSON.parse(localStorage.getItem('dormsphere_user') || '{}');
@@ -10,6 +11,7 @@ export default function AdminDashboard() {
   const [formData, setFormData] = useState({ gateOpen: '', gateClose: '' });
   const [feedback, setFeedback] = useState(null);
   const [retentionActive, setRetentionActive] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     fetchWaves();
@@ -67,8 +69,11 @@ export default function AdminDashboard() {
               style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--cardinal)' }}
             />
           )}
-          <div>
-            <h1>Welcome, <span className="text-cardinal">{user.name || 'Admin'}</span></h1>
+          <div style={{ flex: 1 }}>
+            <div className="flex justify-between items-center">
+              <h1>Welcome, <span className="text-cardinal">{user.name || 'Admin'}</span></h1>
+              <button className="btn btn-sm btn-ghost" onClick={() => setShowSettings(true)}>⚙️ Settings</button>
+            </div>
             <p className="text-muted mt-sm">
               {user.designation} • {user.department}
             </p>
@@ -245,6 +250,7 @@ export default function AdminDashboard() {
           💥 CLEAR ALL DATA
         </button>
       </div>
+      {showSettings && <SettingsModal user={user} onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
