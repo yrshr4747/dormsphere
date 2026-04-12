@@ -122,20 +122,20 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Forcing explicit route mounting to resolve Render 404 issues
+app.use('/api/community', communityRoutes);
+app.use('/api/student', studentRoutes);
+
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Connect to PostgreSQL then start server
 connectDB().then(async () => {
-  // Seed initial data if empty
+  console.log('✅ Database Connected');
   await seedDatabase();
-
-  // Start wave scheduler
   startWaveScheduler(io);
 
-  server.listen(PORT, () => {
-    console.log(`🏛️  DormSphere API running on port ${PORT}`);
-    console.log(`📡 WebSocket server active`);
-    console.log(`🗄️  Database: PostgreSQL`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🏛️  DormSphere API: Explicitly listening on port ${PORT}`);
   });
 }).catch(err => {
   console.error('🚨 FAILED TO CONNECT TO POSTGRESQL ON STARTUP:');

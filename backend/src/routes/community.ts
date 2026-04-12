@@ -80,11 +80,11 @@ router.patch('/lost-found/:id/resolve', authenticate, async (req: AuthRequest, r
 router.get('/grievances', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { rows } = await query(`
-      SELECT g.id, g.title, g.description, g.category, g.is_anonymous, g.status, g.created_at, g.resolved_at,
+      SELECT g.id, g.title, g.description, g.category, g.is_anonymous, g.status, g.created_at, g.resolved_at, g.student_id,
              (SELECT COUNT(*) FROM grievance_upvotes u WHERE u.grievance_id = g.id) AS upvotes,
              EXISTS(SELECT 1 FROM grievance_upvotes u WHERE u.grievance_id = g.id AND u.student_id = $1) AS has_upvoted,
              CASE WHEN g.is_anonymous THEN 'Anonymous Resident' ELSE s.name END as author_name,
-             CASE WHEN g.is_anonymous THEN 'H1' ELSE s.department END as author_dept
+             CASE WHEN g.is_anonymous THEN 'H' || s.year_group ELSE s.department END as author_dept
       FROM public_grievances g
       JOIN students s ON g.student_id = s.id
       ORDER BY upvotes DESC, g.created_at DESC
@@ -172,6 +172,42 @@ router.patch('/grievances/:id/resolve', authenticate, authorize('admin', 'warden
     res.json({ message: 'Grievance marked as resolved.' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to resolve grievance.' });
+  }
+});
+
+// DELETE /api/community/grievances/:id
+router.delete('/grievances/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await query('SELECT student_id FROM public_grievances WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Grievance not found.' });
+
+    if (req.user!.role !== 'admin' && req.user!.role !== 'warden' && rows[0].student_id !== req.user!.id) {
+      return res.status(403).json({ error: 'Unauthorized to delete this grievance.' });
+    }
+
+    await query('DELETE FROM public_grievances WHERE id = $1', [id]);
+    res.json({ message: 'Grievance deleted successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Deletion failed.' });
+  }
+});
+
+// DELETE /api/community/lost-found/:id
+router.delete('/lost-found/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await query('SELECT reported_by FROM lost_and_found WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Item not found.' });
+
+    if (req.user!.role !== 'admin' && req.user!.role !== 'warden' && rows[0].reported_by !== req.user!.id) {
+      return res.status(403).json({ error: 'Unauthorized to delete this item post.' });
+    }
+
+    await query('DELETE FROM lost_and_found WHERE id = $1', [id]);
+    res.json({ message: 'Item post removed successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Deletion failed.' });
   }
 });
 

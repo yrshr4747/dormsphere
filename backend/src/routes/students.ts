@@ -88,6 +88,64 @@ router.get('/match', authenticate, authorize('student'), async (req: AuthRequest
   }
 });
 
+// GET /api/student/top-matches
+// Returns top 5 compatible roommates based on vector similarity (same year only)
+router.get('/top-matches', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { rows: myVecRows } = await query(`
+      SELECT v.sleep, v.study, v.social, s.year_group 
+      FROM vectors v 
+      JOIN students s ON s.id = v.student_id 
+      WHERE v.student_id = $1
+    `, [req.user!.id]);
+
+    if (myVecRows.length === 0) {
+      res.status(404).json({ error: 'Please complete the personality survey to find matches.' });
+      return;
+    }
+
+    const { sleep, study, social, year_group } = myVecRows[0];
+    const myVector = {
+      sleep: parseFloat(sleep),
+      study: parseFloat(study),
+      social: parseFloat(social)
+    };
+
+    // Fetch only students in the same year who have filled the survey
+    const { rows: allVectors } = await query(`
+      SELECT v.student_id, v.sleep, v.study, v.social, s.name, s.roll_number, s.department
+      FROM vectors v
+      JOIN students s ON s.id = v.student_id
+      WHERE v.student_id != $1 AND s.year_group = $2
+    `, [req.user!.id, year_group]);
+
+    const matches = allVectors.map(v => {
+      const targetVector = {
+        sleep: parseFloat(v.sleep),
+        study: parseFloat(v.study),
+        social: parseFloat(v.social)
+      };
+      const score = calculateCompatibility(myVector, targetVector);
+      return {
+        id: v.student_id,
+        name: v.name,
+        rollNumber: v.roll_number,
+        department: v.department,
+        compatibilityScore: score
+      };
+    });
+
+    const topMatches = matches
+      .sort((a, b) => b.compatibilityScore - a.compatibilityScore)
+      .slice(0, 5);
+
+    res.json({ matches: topMatches });
+  } catch (err) {
+    console.error('Top matches error:', err);
+    res.status(500).json({ error: 'Failed to calculate matches.' });
+  }
+});
+
 // GET /api/student/compatibility/:targetId
 router.get('/compatibility/:targetId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
