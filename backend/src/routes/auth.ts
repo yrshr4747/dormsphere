@@ -84,9 +84,9 @@ router.post('/register', upload.single('profileImage'), async (req: RegisterRequ
         },
       } : {}),
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Register error:', err);
-    res.status(500).json({ error: 'Registration failed.' });
+    res.status(500).json({ error: 'Registration failed: ' + err.message });
   }
 });
 

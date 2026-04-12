@@ -86,7 +86,7 @@ export default function Login() {
         startCooldown();
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed.');
+      setError(err.response?.data?.error || `Registration failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -114,7 +114,7 @@ export default function Login() {
       localStorage.setItem('dormsphere_user', JSON.stringify(data.student));
       navigate(roleHome(data.student.role));
     } catch (err) {
-      setError(err.response?.data?.error || 'Verification failed.');
+      setError(err.response?.data?.error || `Verification failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
