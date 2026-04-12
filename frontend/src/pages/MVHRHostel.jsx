@@ -138,8 +138,8 @@ const styles = {
 
 const carouselImages = [
   {
-    url: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200&q=80",
-    caption: "MVHR Exterior"
+    url: "/login-bg.jpg",
+    caption: "IIITDM Kurnool Main Campus"
   },
   {
     url: "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=1200&q=80",
