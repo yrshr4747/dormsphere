@@ -1,25 +1,22 @@
-import fs from 'fs';
 import multer from 'multer';
-import path from 'path';
+import { Request } from 'express';
 
-const uploadsDir = path.resolve(__dirname, '../../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req: any, _file: any, cb: any) => {
-    cb(null, uploadsDir);
-  },
-  filename: (_req: any, file: any, cb: any) => {
-    const ext = path.extname(file.originalname) || '.bin';
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-  },
-});
+// Use memory storage — files stay in buffer, never touch disk.
+// This is required for Render (ephemeral filesystem) + Cloudinary (upload from buffer).
+const storage = multer.memoryStorage();
 
 export const upload = multer({
   storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit (video support)
+  },
+  fileFilter: (_req: Request, file: Express.Multer.File, cb: any) => {
+    const allowed = /^(image|video)\//;
+    if (allowed.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image and video files are allowed.'));
+    }
   },
 });
+

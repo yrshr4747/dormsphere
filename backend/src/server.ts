@@ -9,8 +9,6 @@ import { connectDB } from './db/connection';
 import { initWebSocket } from './services/websocket';
 import { seedDatabase } from './db/seed';
 import { startWaveScheduler } from './services/waveScheduler';
-import fs from 'fs';
-import path from 'path';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -25,6 +23,7 @@ import electionRoutes from './routes/elections';
 import waveRoutes from './routes/waves';
 import roommateRoutes from './routes/roommates';
 import adminRoutes from './routes/admin';
+import mediaRoutes from './routes/media';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -39,11 +38,7 @@ app.use((req, res, next) => {
 });
 const server = http.createServer(app);
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+
 
 // Build allowed origins list from FRONTEND_URL (comma-separated) + localhost
 const allowedOrigins: string[] = ['http://localhost:5173'];
@@ -78,8 +73,7 @@ app.use(cors({
   origin: checkOrigin,
   credentials: true,
 }));
-// Serve uploads statically
-app.use('/uploads', express.static(uploadsDir));
+
 
 // Make io available in routes
 app.set('io', io);
@@ -107,6 +101,7 @@ app.use('/api/elections', electionRoutes);
 app.use('/api/waves', waveRoutes);
 app.use('/api/roommates', roommateRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/media', mediaRoutes);
 
 // WebSocket init
 initWebSocket(io);

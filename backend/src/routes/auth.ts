@@ -5,13 +5,14 @@ import { query } from '../db/connection';
 import { generateOTP, sendOTP } from '../services/email';
 import { parseIdentity, UserIdentity } from '../utils/parseIdentity';
 import { upload } from '../middleware/upload';
+import { uploadToCloudinary } from '../services/cloudinary';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 const JWT_EXPIRY = 86400; // 24 hours
 
 type RegisterRequest = Request & {
-  file?: { filename?: string };
+  file?: Express.Multer.File;
   identity?: UserIdentity;
 };
 
@@ -163,7 +164,15 @@ const registerController = async (req: RegisterRequest, res: Response) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const profileImageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    let profileImageUrl: string | null = null;
+    if (req.file) {
+      try {
+        profileImageUrl = await uploadToCloudinary(req.file.buffer, 'dormsphere/profiles');
+      } catch (uploadErr) {
+        console.error('Cloudinary upload error:', uploadErr);
+        // Continue without image rather than failing registration
+      }
+    }
     let student: any;
 
     if (identity.role === 'student') {
