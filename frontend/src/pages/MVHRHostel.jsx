@@ -2,40 +2,48 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 /* 
-  We use an isolated CSS block here to apply the Stanford "Light Mode Academic" 
-  aesthetic solely to this component, without breaking the dark glassmorphism
-  of the rest of the application.
+  High-Fidelity Stanford-Style Landing Page
 */
 const styles = {
   container: {
-    fontFamily: "'Inter', sans-serif",
-    backgroundColor: '#FFFFFF',
-    color: '#212529',
+    fontFamily: "'Source Sans Pro', 'Inter', sans-serif",
+    backgroundColor: '#FAF8F5', // Stanford off-white background
+    color: '#2E2D29',
     minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  heroImageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: '500px',
   },
   heroImage: {
     width: '100%',
-    height: '400px',
+    height: '100%',
     objectFit: 'cover',
     display: 'block',
   },
   headerBanner: {
-    backgroundColor: '#2D368B', // IIITDM Sapphire Blue
+    backgroundColor: '#8C1515', // Stanford Cardinal Red
     color: '#FFFFFF',
-    padding: '3rem 2rem',
+    padding: '2.5rem 2rem',
     textAlign: 'center',
     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    position: 'relative',
+    zIndex: 10,
   },
   title: {
-    fontFamily: "'Merriweather', serif",
-    fontSize: '2.5rem',
+    fontFamily: "'Source Serif Pro', 'Merriweather', serif",
+    fontSize: '2.8rem',
     fontWeight: 700,
     margin: '0 0 1.5rem 0',
+    letterSpacing: '0.02em',
   },
   navTabs: {
     display: 'flex',
     justifyContent: 'center',
-    gap: '2rem',
+    gap: '3rem',
     listStyle: 'none',
     padding: 0,
     margin: 0,
@@ -43,79 +51,125 @@ const styles = {
   },
   navTab: {
     color: '#FFFFFF',
-    fontSize: '1rem',
+    fontSize: '1.05rem',
     fontWeight: 600,
     cursor: 'pointer',
     position: 'relative',
-    paddingBottom: '0.25rem',
+    paddingBottom: '0.5rem',
+    transition: 'all 0.2s',
   },
   activeTabIndicator: {
     position: 'absolute',
-    bottom: -4,
+    bottom: 0,
     left: 0,
     width: '100%',
-    height: '3px',
-    backgroundColor: '#74BD44', // IIITDM Lime Green
+    height: '4px',
+    backgroundColor: '#FFFFFF',
   },
   contentSection: {
-    maxWidth: '1000px',
+    maxWidth: '1200px',
     margin: '0 auto',
     padding: '4rem 2rem',
+    flex: 1,
+    width: '100%',
   },
   sectionTitle: {
-    fontFamily: "'Merriweather', serif",
-    fontSize: '2rem',
-    color: '#2D368B',
+    fontFamily: "'Source Serif Pro', 'Merriweather', serif",
+    fontSize: '2.2rem',
+    color: '#2E2D29',
     textAlign: 'center',
-    marginBottom: '2rem',
+    marginBottom: '2.5rem',
+    fontWeight: 700,
   },
   textRow: {
     display: 'flex',
-    borderBottom: '1px solid #DEE2E6',
-    padding: '1rem 0',
-    alignItems: 'center',
+    borderBottom: '1px solid #D5D1C4',
+    padding: '1.2rem 0',
+    alignItems: 'flex-start',
   },
   textRowLabel: {
-    fontWeight: 700,
-    width: '35%',
-    color: '#495057',
+    fontWeight: 600,
+    width: '40%',
+    color: '#2E2D29',
+    fontSize: '1.05rem',
   },
   textRowValue: {
-    width: '65%',
-    color: '#212529',
+    width: '60%',
+    color: '#4D4F53',
+    lineHeight: 1.6,
   },
-  backButton: {
-    padding: '0.5rem 1rem',
-    backgroundColor: '#FFFFFF',
-    color: '#2D368B',
-    border: '1px solid #2D368B',
+  actionButton: {
+    padding: '1rem 2rem',
+    backgroundColor: '#8C1515',
+    color: '#FFFFFF',
+    border: 'none',
     borderRadius: '4px',
     textDecoration: 'none',
     fontWeight: 600,
+    fontSize: '1.1rem',
     display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: '0.5rem',
     marginTop: '2rem',
+    cursor: 'pointer',
+    boxShadow: '0 4px 6px rgba(140, 21, 21, 0.2)',
+    transition: 'background-color 0.2s',
+  },
+  carouselContainer: {
+    position: 'relative',
+    width: '100%',
+    height: '500px',
+    backgroundColor: '#000',
+    overflow: 'hidden',
+  },
+  carouselButton: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    background: 'rgba(255,255,255,0.8)',
+    border: 'none',
+    fontSize: '2rem',
+    cursor: 'pointer',
+    padding: '1rem',
+    zIndex: 10,
   }
 };
 
+const carouselImages = [
+  {
+    url: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200&q=80",
+    caption: "MVHR Exterior"
+  },
+  {
+    url: "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=1200&q=80",
+    caption: "Lounge Area"
+  },
+  {
+    url: "https://images.unsplash.com/photo-1522771730849-f4d2f02cb849?auto=format&fit=crop&w=1200&q=80",
+    caption: "Typical Room"
+  }
+];
+
 export default function MVHRHostel() {
   const [activeTab, setActiveTab] = useState('general');
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // Replace with actual IIITDM Kurnool Main Gate image if available
-  const heroImageUrl = "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200&q=80";
+  const nextImage = () => setCurrentImageIndex((prev) => (prev + 1) % carouselImages.length);
+  const prevImage = () => setCurrentImageIndex((prev) => (prev - 1 + carouselImages.length) % carouselImages.length);
 
   return (
     <div style={styles.container}>
-      {/* Hero Image - IIITDM Main Gate placeholder */}
-      <img src={heroImageUrl} alt="IIITDM Kurnool Campus" style={styles.heroImage} />
+      {/* Dynamic Hero Image */}
+      <div style={styles.heroImageContainer}>
+        <img src={carouselImages[0].url} alt="Hostel Exterior" style={styles.heroImage} />
+      </div>
 
-      {/* Red/Blue Header Banner with Tabs */}
+      {/* Red Header Banner with Tabs */}
       <div style={styles.headerBanner}>
-        <h1 style={styles.title}>MVHR Hostel</h1>
-        
+        <h1 style={styles.title}>MVHR Hall</h1>
         <ul style={styles.navTabs}>
-          {['General Information', 'Pictures and Floor Plans', 'Furnishings'].map((tab) => {
+          {['General Information', 'Pictures and Floor Plans', 'Furnishings', 'Rates Chart'].map((tab) => {
             const tabKey = tab.split(' ')[0].toLowerCase();
             return (
               <li 
@@ -136,27 +190,34 @@ export default function MVHRHostel() {
         {activeTab === 'general' && (
           <div className="animate-fade-in">
             <h2 style={styles.sectionTitle}>General Information</h2>
-            <p style={{ lineHeight: 1.8, marginBottom: '2rem', color: '#495057' }}>
-              MVHR is an elegant, structured building known for its vibrant spirit. It houses students primarily in singles and doubles. Located near the main academic blocks, it provides a highly focused environment for the scholars at IIITDM Kurnool.
+            <p style={{ lineHeight: 1.8, marginBottom: '3rem', color: '#4D4F53', fontSize: '1.1rem', textAlign: 'center', maxWidth: '800px', margin: '0 auto 3rem auto' }}>
+              MVHR is an elegant, premier residential building known for its vibrant spirit. It houses approximately 240 students, primarily in singles and doubles. 
+              Designed to reflect modern university architecture, it provides an exceptional living and learning environment for scholars.
             </p>
             
-            <div style={{ background: '#F8F9FA', padding: '2rem', border: '1px solid #DEE2E6' }}>
+            <div style={{ background: '#FFFFFF', padding: '3rem', border: '1px solid #D5D1C4', borderRadius: '4px' }}>
               <div style={styles.textRow}>
                 <div style={styles.textRowLabel}>Population</div>
-                <div style={styles.textRowValue}>~ 240 Students</div>
+                <div style={styles.textRowValue}>~ 240 Undergraduate Students</div>
               </div>
               <div style={styles.textRow}>
                 <div style={styles.textRowLabel}>Room Types</div>
-                <div style={styles.textRowValue}>Singles, Doubles</div>
+                <div style={styles.textRowValue}>Singles, Doubles (Standard & Attached Bath)</div>
               </div>
               <div style={styles.textRow}>
                 <div style={styles.textRowLabel}>Common Areas</div>
-                <div style={styles.textRowValue}>Lounge, Seminar Room, Computer Cluster</div>
+                <div style={styles.textRowValue}>Grand Lounge, Seminar Room, Fully Equipped Computer Cluster, Music Room</div>
               </div>
               <div style={styles.textRow}>
                 <div style={styles.textRowLabel}>Accessibility</div>
-                <div style={styles.textRowValue}>Elevator access, ramps on ground floor</div>
+                <div style={styles.textRowValue}>Elevator access, ADA-compliant ramps on the ground floor. For information on accessibility, please reference our Undergraduate Residences Accessibility Summary chart.</div>
               </div>
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '4rem' }}>
+              <Link to="/rooms" style={styles.actionButton}>
+                Enter Room Selection Portal →
+              </Link>
             </div>
           </div>
         )}
@@ -164,20 +225,34 @@ export default function MVHRHostel() {
         {activeTab === 'pictures' && (
           <div className="animate-fade-in">
             <h2 style={styles.sectionTitle}>Pictures and Floor Plans</h2>
-            <p style={{ textAlign: 'center', marginBottom: '2rem', color: '#6C757D' }}>
-              Floor plans are restricted to verified residents only.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+            
+            {/* Image Carousel */}
+            <div style={{...styles.carouselContainer, marginBottom: '3rem'}}>
+              <button style={{...styles.carouselButton, left: 10}} onClick={prevImage}>〈</button>
               <img 
-                src="https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=600&q=80" 
-                alt="Lounge Area" 
-                style={{ width: '100%', height: '250px', objectFit: 'cover', border: '4px solid #F8F9FA', outline: '1px solid #DEE2E6' }} 
+                src={carouselImages[currentImageIndex].url} 
+                alt={carouselImages[currentImageIndex].caption} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
               />
-              <img 
-                src="https://images.unsplash.com/photo-1522771730849-f4d2f02cb849?auto=format&fit=crop&w=600&q=80" 
-                alt="Typical Room" 
-                style={{ width: '100%', height: '250px', objectFit: 'cover', border: '4px solid #F8F9FA', outline: '1px solid #DEE2E6' }} 
-              />
+              <div style={{ position: 'absolute', bottom: 0, width: '100%', background: 'rgba(140,21,21,0.9)', color: 'white', padding: '1rem', textAlign: 'center', fontWeight: 'bold' }}>
+                {carouselImages[currentImageIndex].caption}
+              </div>
+              <button style={{...styles.carouselButton, right: 10}} onClick={nextImage}>〉</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', marginTop: '2rem' }}>
+              <div style={{ background: '#FFFFFF', padding: '2rem', border: '1px solid #D5D1C4', textAlign: 'center' }}>
+                <h4 style={{ color: '#8C1515', marginBottom: '1rem' }}>A - Single Room Blueprint</h4>
+                <div style={{ width: '100%', height: '250px', border: '2px dashed #D5D1C4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8C1515', fontWeight: 'bold' }}>
+                  Floorplan Illustration
+                </div>
+              </div>
+              <div style={{ background: '#FFFFFF', padding: '2rem', border: '1px solid #D5D1C4', textAlign: 'center' }}>
+                <h4 style={{ color: '#8C1515', marginBottom: '1rem' }}>B - Double Room Blueprint</h4>
+                <div style={{ width: '100%', height: '250px', border: '2px dashed #D5D1C4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8C1515', fontWeight: 'bold' }}>
+                  Floorplan Illustration
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -185,30 +260,80 @@ export default function MVHRHostel() {
         {activeTab === 'furnishings' && (
           <div className="animate-fade-in">
             <h2 style={styles.sectionTitle}>Furnishings</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem' }}>
               <div>
-                <div style={styles.textRow}><div style={{width:'100%'}}>Tile/Vitrified Flooring</div></div>
-                <div style={styles.textRow}><div style={{width:'100%'}}>High-speed internet access (LAN & WiFi)</div></div>
-                <div style={styles.textRow}><div style={{width:'100%'}}>Waste basket and recycling bin</div></div>
-                <div style={styles.textRow}><div style={{width:'100%'}}>Ceiling fan and tube lights</div></div>
+                <div style={styles.textRow}>Wall-to-wall carpeting or Tile</div>
+                <div style={styles.textRow}>Window coverings</div>
+                <div style={styles.textRow}>High-speed internet access</div>
+                <div style={styles.textRow}>Waste basket and recycling bin</div>
+                <div style={styles.textRow}>Centralized Air Conditioning</div>
               </div>
               <div>
-                <div style={styles.textRow}><div style={{width:'100%'}}>Standard single bed</div></div>
-                <div style={styles.textRow}><div style={{width:'100%'}}>Study desk and chair</div></div>
-                <div style={styles.textRow}><div style={{width:'100%'}}>Built-in bookshelf</div></div>
-                <div style={styles.textRow}><div style={{width:'100%'}}>Wooden wardrobe/dresser</div></div>
+                <div style={styles.textRow}>Standard twin bed</div>
+                <div style={styles.textRow}>Desk and chair</div>
+                <div style={styles.textRow}>Bookcase</div>
+                <div style={styles.textRow}>Dresser</div>
+                <div style={styles.textRow}>Sink with mirror (in select rooms)</div>
               </div>
             </div>
-            <p style={{ marginTop: '2rem', fontSize: '0.85rem', color: '#6C757D', padding: '1rem', background: '#F8F9FA' }}>
-              Note: Students must provide their own mattresses, bed linens, cookware, and other personal items. No institutional storage is available for unneeded furniture.
+            <p style={{ marginTop: '3rem', fontSize: '0.95rem', color: '#4D4F53', padding: '1.5rem', background: '#FFFFFF', border: '1px solid #D5D1C4' }}>
+              Note: Students who want to bring their own beds may store the university-supplied bed at their own expense. No storage is available for unneeded furniture. Students provide their own cookware, dishes, utensils, towels, and other kitchen items.
             </p>
           </div>
         )}
 
-        <div style={{ textAlign: 'center' }}>
-          <Link to="/" style={styles.backButton}>
-            ← Return to Dashboard
-          </Link>
+        {activeTab === 'rates' && (
+          <div className="animate-fade-in">
+            <h2 style={styles.sectionTitle}>Rates Chart (2025-2026)</h2>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#FFFFFF', border: '1px solid #D5D1C4' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#8C1515', color: '#FFFFFF' }}>
+                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Room Type</th>
+                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Autumn Quarter</th>
+                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Winter Quarter</th>
+                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Spring Quarter</th>
+                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Total Annual</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #D5D1C4' }}>
+                    <td style={{ padding: '1.5rem', fontWeight: 'bold' }}>Standard Single</td>
+                    <td style={{ padding: '1.5rem' }}>$4,200</td>
+                    <td style={{ padding: '1.5rem' }}>$4,200</td>
+                    <td style={{ padding: '1.5rem' }}>$4,200</td>
+                    <td style={{ padding: '1.5rem', fontWeight: 'bold' }}>$12,600</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '1.5rem', fontWeight: 'bold' }}>Standard Double</td>
+                    <td style={{ padding: '1.5rem' }}>$3,600</td>
+                    <td style={{ padding: '1.5rem' }}>$3,600</td>
+                    <td style={{ padding: '1.5rem' }}>$3,600</td>
+                    <td style={{ padding: '1.5rem', fontWeight: 'bold' }}>$10,800</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p style={{ marginTop: '2rem', textAlign: 'center', color: '#6C757D' }}>
+              * Rates are subject to standard university approval processing and may vary based on financial aid packages.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ backgroundColor: '#F0EFEA', padding: '3rem 2rem', marginTop: 'auto', borderTop: '1px solid #D5D1C4' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '2rem' }}>
+          <div>
+            <h4 style={{ color: '#8C1515', margin: '0 0 0.5rem 0', fontFamily: "'Source Serif Pro', serif" }}>Residential & Dining Enterprises</h4>
+            <p style={{ margin: 0, color: '#4D4F53', fontSize: '0.9rem' }}>Creating a Culture of Excellence</p>
+          </div>
+          <div style={{ display: 'flex', gap: '2rem', fontSize: '0.9rem', color: '#2E2D29', fontWeight: 600 }}>
+            <span style={{cursor:'pointer'}}>Terms of Use</span>
+            <span style={{cursor:'pointer'}}>Privacy</span>
+            <span style={{cursor:'pointer'}}>Contact</span>
+            <span style={{cursor:'pointer'}}>Careers</span>
+          </div>
         </div>
       </div>
     </div>
