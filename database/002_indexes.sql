@@ -36,3 +36,11 @@ CREATE INDEX idx_infra_hostel ON infra_status(hostel_id);
 -- Assets
 CREATE INDEX idx_assets_hostel ON assets(hostel_id);
 CREATE INDEX idx_asset_checkouts_status ON asset_checkouts(status) WHERE status = 'checked_out';
+
+-- Room signals (heatmap)
+CREATE INDEX idx_room_signals_room ON room_signals(room_id);
+CREATE INDEX idx_room_signals_student ON room_signals(student_id);
+
+-- OTPs
+CREATE INDEX idx_otps_email_purpose ON otps(email, purpose);
+CREATE INDEX idx_otps_expires ON otps(expires_at);

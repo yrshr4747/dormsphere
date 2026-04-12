@@ -9,6 +9,9 @@ export default function Dashboard() {
   const [lottery, setLottery] = useState(null);
   const [infra, setInfra] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [retention, setRetention] = useState(null);
+  const [roommateStatus, setRoommateStatus] = useState(null);
+  const [inviteRoll, setInviteRoll] = useState('');
 
   useEffect(() => {
     Promise.allSettled([
@@ -16,14 +19,27 @@ export default function Dashboard() {
       api.get('/student/match'),
       api.get('/lottery/rank'),
       api.get('/infra/status'),
-    ]).then(([aRes, mRes, lRes, iRes]) => {
+      api.get('/student/retention/status'),
+      api.get('/roommates/status'),
+    ]).then(([aRes, mRes, lRes, iRes, rRes, rmRes]) => {
       if (aRes.status === 'fulfilled') setAssignment(aRes.value.data.assignment);
       if (mRes.status === 'fulfilled') setMatch(mRes.value.data.match);
       if (lRes.status === 'fulfilled') setLottery(lRes.value.data.lottery);
       if (iRes.status === 'fulfilled') setInfra(iRes.value.data.infrastructure || []);
+      if (rRes.status === 'fulfilled') setRetention(rRes.value.data);
+      if (rmRes.status === 'fulfilled') setRoommateStatus(rmRes.value.data);
       setLoading(false);
     });
   }, []);
+
+  const refreshRoommates = async () => {
+    try {
+      const { data } = await api.get('/roommates/status');
+      setRoommateStatus(data);
+    } catch (err) {
+      console.error('Roommate refresh failed:', err);
+    }
+  };
 
   if (loading) {
     return (
@@ -36,12 +52,57 @@ export default function Dashboard() {
   return (
     <div className="page container">
       {/* Welcome Header */}
-      <div className="mb-xl animate-slide-up">
-        <h1>Welcome back, <span className="text-cardinal">{user.name || 'Student'}</span></h1>
-        <p className="text-muted mt-sm">
-          {user.rollNumber} • {user.department} • Year {user.year}
-        </p>
+      <div className="mb-xl animate-slide-up flex items-center gap-md">
+        {user.profileImageUrl && (
+          <img 
+            src={user.profileImageUrl.startsWith('http') ? user.profileImageUrl : `${import.meta.env.VITE_API_URL || ''}${user.profileImageUrl}`} 
+            alt="Profile" 
+            style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--cardinal)' }}
+          />
+        )}
+        <div>
+          <h1>Welcome back, <span className="text-cardinal">{user.name || 'Student'}</span></h1>
+          <p className="text-muted mt-sm">
+            {user.rollNumber} • {user.department} • Year {user.yearGroup || user.year || 1}
+          </p>
+        </div>
       </div>
+
+      {/* Retention Card */}
+      {retention && retention.yearGroup >= 3 && retention.retentionWindowActive && retention.retentionStatus === 'none' && retention.previousRoom && (
+        <div className="glass-card mb-xl animate-fade-in" style={{ border: '2px solid var(--accent-gold)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 style={{ color: 'var(--accent-gold)', marginBottom: 'var(--space-xs)' }}>🕰️ Senior Retention Required</h3>
+              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                You previously lived in Room {retention.previousRoom.room_number}. You can retain this room or enter the wave pool.
+              </p>
+            </div>
+            <div className="flex gap-sm">
+              <button className="btn btn-sm btn-ghost" onClick={async () => {
+                try {
+                  await api.post('/student/retention', { action: 'release' });
+                  window.location.reload();
+                } catch(e){}
+              }}>Enter Wave Pool</button>
+              <button 
+                className="btn btn-sm" 
+                style={{ background: 'var(--accent-gold)', color: '#000' }}
+                onClick={async () => {
+                  try {
+                    await api.post('/student/retention', { action: 'retain' });
+                    window.location.reload();
+                  } catch(e) {
+                    alert('Error retaining room: ' + (e.response?.data?.error || e.message));
+                  }
+                }}
+              >
+                Retain Room {retention.previousRoom.room_number}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Action Cards */}
       <div className="grid-4 mb-xl">
@@ -120,35 +181,69 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Roommate Match */}
+        {/* Roommate Network */}
         <div className="glass-card-static">
           <div className="flex items-center justify-between mb-md">
-            <h3>👥 Roommate</h3>
-            {match ? (
-              <span className="badge badge-gold">{match.compatibilityScore}%</span>
-            ) : (
-              <span className="badge badge-cardinal">No Match</span>
-            )}
+            <h3>👥 Mutual Roommate</h3>
           </div>
-          {match ? (
-            <div>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600 }}>{match.partnerName}</p>
-              <p className="text-muted" style={{ fontSize: '0.85rem' }}>{match.partnerRoll}</p>
-              <div className="progress-bar mt-md">
-                <div
-                  className="progress-fill progress-fill-gold"
-                  style={{ width: `${match.compatibilityScore}%` }}
-                />
-              </div>
-              <p className="text-muted mt-sm" style={{ fontSize: '0.75rem' }}>
-                Compatibility: {match.compatibilityScore}%
+          <div className="flex flex-col gap-sm" style={{ minHeight: '120px' }}>
+            {roommateStatus?.activePartner ? (
+              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                Connected with <span className="text-cardinal">{roommateStatus.activePartner.partner_name}</span> ({roommateStatus.activePartner.partner_roll})
               </p>
+            ) : (
+              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                Pending requests or active handshakes appear here.
+              </p>
+            )}
+            {(roommateStatus?.incomingRequests?.length || 0) > 0 && (
+              <div className="flex flex-col gap-sm">
+                {roommateStatus.incomingRequests.map((request) => (
+                  <div key={request.id} style={{ fontSize: '0.8rem' }}>
+                    <span>{request.inviter_name} ({request.inviter_roll})</span>
+                    <div className="flex gap-sm mt-sm">
+                      <button className="btn btn-sm btn-cardinal" onClick={async () => {
+                        await api.post('/roommates/respond', { pairingId: request.id, action: 'accept' });
+                        await refreshRoommates();
+                      }}>Accept</button>
+                      <button className="btn btn-sm btn-ghost" onClick={async () => {
+                        await api.post('/roommates/respond', { pairingId: request.id, action: 'reject' });
+                        await refreshRoommates();
+                      }}>Reject</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-sm mt-auto">
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Roll Number"
+                style={{ flex: 1, padding: '0.4rem' }}
+                value={inviteRoll}
+                onChange={(e) => setInviteRoll(e.target.value.toUpperCase())}
+              />
+              <button className="btn btn-sm btn-cardinal" onClick={async () => {
+                try {
+                  if (!inviteRoll) return;
+                  await api.post('/roommates/invite', { rollNumber: inviteRoll });
+                  setInviteRoll('');
+                  await refreshRoommates();
+                } catch(e) {
+                  alert(e.response?.data?.error || 'Invitation failed.');
+                }
+              }}>Invite</button>
             </div>
-          ) : (
-            <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-              Complete the <Link to="/survey" className="text-cardinal">personality survey →</Link>
+            {(roommateStatus?.outgoingRequests?.length || 0) > 0 && (
+              <p className="text-muted" style={{ fontSize: '0.75rem' }}>
+                Pending outgoing: {roommateStatus.outgoingRequests.map((r) => `${r.invitee_name} (${r.invitee_roll})`).join(', ')}
+              </p>
+            )}
+            <p className="text-muted text-center" style={{ fontSize: '0.8rem', marginTop: 'var(--space-xs)' }}>
+              Check <Link to="/survey" className="text-cardinal">survey matches</Link> to find peers.
             </p>
-          )}
+          </div>
         </div>
 
         {/* Lottery Rank */}

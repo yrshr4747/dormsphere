@@ -1,12 +1,36 @@
-version: '3.8'
 services:
-  redis:
-    image: redis:7-alpine
+  # 1. The Database: Matches your Render postgresql:// link
+  db:
+    image: postgres:16-alpine
+    container_name: dormsphere-db
+    restart: always
+    environment:
+      POSTGRES_USER: yashraj
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: dormsphere
     ports:
-      - '6379:6379'
+      - "5432:5432"
     volumes:
-      - redis_data:/data
-    restart: unless-stopped
+      - postgres_data:/var/lib/postgresql/data
+      # Mount schema + indexes only — seeding is handled by the TS seeder on first boot
+      - ./database/001_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./database/002_indexes.sql:/docker-entrypoint-initdb.d/02_indexes.sql
+
+  # 2. Backend: Compiles C++ Engines + Node.js API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dormsphere-backend
+    ports:
+      - "3001:3001"
+    environment:
+      # Note: Uses the service name 'db' as the host
+      - DATABASE_URL=postgresql://yashraj:password@db:5432/dormsphere
+      - JWT_SECRET=your_dev_secret
+      - PORT=3001
+    depends_on:
+      - db
 
 volumes:
-  redis_data:
+  postgres_data:

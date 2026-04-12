@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import InfraStatus from '../models/InfraStatus';
+import { query } from '../db/connection';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -7,21 +7,14 @@ const router = Router();
 // GET /api/infra/status
 router.get('/status', async (_req, res: Response) => {
   try {
-    const infra = await InfraStatus.find()
-      .populate('hostelId', 'name code')
-      .lean();
+    const { rows } = await query(`
+      SELECT i.id, h.name AS hostel_name, h.code AS hostel_code,
+             i.wifi_strength, i.power_status, i.water_status, i.last_updated
+      FROM infra_status i
+      JOIN hostels h ON h.id = i.hostel_id
+    `);
 
-    const result = infra.map((i: any) => ({
-      id: i._id,
-      hostel_name: i.hostelId?.name,
-      hostel_code: i.hostelId?.code,
-      wifi_strength: i.wifiStrength,
-      power_status: i.powerStatus,
-      water_status: i.waterStatus,
-      last_updated: i.lastUpdated,
-    }));
-
-    res.json({ infrastructure: result });
+    res.json({ infrastructure: rows });
   } catch (err) {
     console.error('Infra status error:', err);
     res.status(500).json({ error: 'Failed to fetch infrastructure status.' });
@@ -29,26 +22,32 @@ router.get('/status', async (_req, res: Response) => {
 });
 
 // PUT /api/infra/status/:hostelId — warden update
-router.put('/status/:hostelId', authenticate, authorize('warden'), async (req: AuthRequest, res: Response) => {
+router.put('/status/:hostelId', authenticate, authorize('admin', 'warden'), async (req: AuthRequest, res: Response) => {
   try {
     const { wifiStrength, powerStatus, waterStatus } = req.body;
-    const update: any = { lastUpdated: new Date() };
-    if (wifiStrength !== undefined) update.wifiStrength = wifiStrength;
-    if (powerStatus !== undefined) update.powerStatus = powerStatus;
-    if (waterStatus !== undefined) update.waterStatus = waterStatus;
 
-    const infra = await InfraStatus.findOneAndUpdate(
-      { hostelId: req.params.hostelId },
-      update,
-      { new: true }
+    const setClauses: string[] = ['last_updated = NOW()'];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (wifiStrength !== undefined) { setClauses.push(`wifi_strength = $${idx++}`); params.push(wifiStrength); }
+    if (powerStatus !== undefined) { setClauses.push(`power_status = $${idx++}`); params.push(powerStatus); }
+    if (waterStatus !== undefined) { setClauses.push(`water_status = $${idx++}`); params.push(waterStatus); }
+
+    params.push(req.params.hostelId);
+
+    const { rows } = await query(
+      `UPDATE infra_status SET ${setClauses.join(', ')} WHERE hostel_id = $${idx} RETURNING *`,
+      params,
     );
-    if (!infra) { res.status(404).json({ error: 'Hostel not found.' }); return; }
+
+    if (rows.length === 0) { res.status(404).json({ error: 'Hostel not found.' }); return; }
 
     // Broadcast update
     const io = req.app.get('io');
-    if (io) io.emit('infra:updated', { hostelId: req.params.hostelId, ...update });
+    if (io) io.emit('infra:updated', { hostelId: req.params.hostelId, ...rows[0] });
 
-    res.json({ message: 'Infrastructure status updated.', infra });
+    res.json({ message: 'Infrastructure status updated.', infra: rows[0] });
   } catch (err) {
     console.error('Infra update error:', err);
     res.status(500).json({ error: 'Update failed.' });

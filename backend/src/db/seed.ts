@@ -1,15 +1,35 @@
 import bcrypt from 'bcryptjs';
-import Student from '../models/Student';
-import Hostel from '../models/Hostel';
-import Room from '../models/Room';
-import InfraStatus from '../models/InfraStatus';
-import { Asset } from '../models/Asset';
-import { Election } from '../models/Election';
+import { query } from './connection';
+import { parseIdentity } from '../utils/parseIdentity';
 
 export async function seedDatabase(): Promise<void> {
-  // Only seed if empty
-  const hostelCount = await Hostel.countDocuments();
-  if (hostelCount > 0) {
+  // Only seed hostels/students if the hostels table is empty
+  const { rows } = await query('SELECT COUNT(*) AS cnt FROM hostels');
+  const hostelsExist = parseInt(rows[0].cnt, 10) > 0;
+
+  const ensureWaves = async (isActive: boolean): Promise<void> => {
+    const { rows: waveRows } = await query('SELECT COUNT(*) AS cnt FROM waves');
+    if (parseInt(waveRows[0].cnt, 10) > 0) return;
+
+    console.log('🌊 Waves missing. Injecting Year 1-5 waves...');
+    const waveDefs = [
+      { name: 'Year 5 — Senior Priority', yearGroup: 5 },
+      { name: 'Year 4 — Pre-Final Year', yearGroup: 4 },
+      { name: 'Year 3 — Third Year', yearGroup: 3 },
+      { name: 'Year 2 — Sophomores', yearGroup: 2 },
+      { name: 'Year 1 — Freshers', yearGroup: 1 },
+    ];
+    for (const w of waveDefs) {
+      await query(
+        'INSERT INTO waves (name, year_group, gate_open, gate_close, is_active, status) VALUES ($1, $2, NOW(), NOW() + INTERVAL \'30 days\', $3, $4)',
+        [w.name, w.yearGroup, isActive, isActive ? 'active' : 'pending'],
+      );
+    }
+    console.log('✅ 5 waves injected.');
+  };
+
+  if (hostelsExist) {
+    await ensureWaves(false);
     console.log('📦 Database already seeded');
     return;
   }
@@ -17,120 +37,138 @@ export async function seedDatabase(): Promise<void> {
   console.log('🌱 Seeding database...');
 
   // --- Hostels ---
-  const hostels = await Hostel.insertMany([
-    { name: 'MVHR Block A', code: 'MVHR-A', totalRooms: 50, floors: 3 },
-    { name: 'MVHR Block B', code: 'MVHR-B', totalRooms: 50, floors: 3 },
-    { name: 'MVHR Block C', code: 'MVHR-C', totalRooms: 50, floors: 3 },
-    { name: 'MVHR Block D', code: 'MVHR-D', totalRooms: 50, floors: 3 },
-  ]);
+  const hostelIds = [
+    'a0000001-0000-0000-0000-000000000001',
+    'a0000001-0000-0000-0000-000000000002',
+    'a0000001-0000-0000-0000-000000000003',
+    'a0000001-0000-0000-0000-000000000004',
+  ];
+  const hostelData = [
+    { name: 'MVHR Block A', code: 'MVHR-A' },
+    { name: 'MVHR Block B', code: 'MVHR-B' },
+    { name: 'MVHR Block C', code: 'MVHR-C' },
+    { name: 'MVHR Block D', code: 'MVHR-D' },
+  ];
 
-  // --- Rooms (200 total) ---
-  const roomDocs: any[] = [];
-  for (const hostel of hostels) {
+  for (let i = 0; i < hostelData.length; i++) {
+    await query(
+      'INSERT INTO hostels (id, name, code, total_rooms, floors) VALUES ($1, $2, $3, 50, 3)',
+      [hostelIds[i], hostelData[i].name, hostelData[i].code],
+    );
+  }
+
+  // --- Rooms (200+ total) ---
+  for (const hId of hostelIds) {
     for (let floor = 1; floor <= 3; floor++) {
       for (let r = 1; r <= 17; r++) {
-        roomDocs.push({
-          hostelId: hostel._id,
-          floor,
-          roomNumber: `${floor}${String(r).padStart(2, '0')}`,
-          capacity: 2,
-          occupied: 0,
-          isAvailable: true,
-        });
+        const roomNum = `${floor}${String(r).padStart(2, '0')}`;
+        await query(
+          'INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available) VALUES ($1, $2, $3, 2, 0, true)',
+          [hId, floor, roomNum],
+        );
       }
     }
-    // 1 single room per floor for some variety
-    roomDocs.push({ hostelId: hostel._id, floor: 1, roomNumber: '100', capacity: 1, occupied: 0, isAvailable: true });
-    roomDocs.push({ hostelId: hostel._id, floor: 2, roomNumber: '200', capacity: 1, occupied: 0, isAvailable: true });
+    // Extra single rooms
+    await query('INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available) VALUES ($1, 1, $2, 1, 0, true)', [hId, '100']);
+    await query('INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available) VALUES ($1, 2, $2, 1, 0, true)', [hId, '200']);
   }
-  await Room.insertMany(roomDocs);
 
-  // --- Students (100 B.Tech + some Dual Degree) ---
+  // --- Students ---
+  // Realistic IIITDM Kurnool roll numbers: (1|5)(batch)(branch)(serial)
+  // In 2026: batch 21→Yr5, 22→Yr4, 23→Yr3, 24→Yr2, 25→Yr1
   const passwordHash = await bcrypt.hash('dormsphere123', 10);
+  const batches = [21, 22, 23, 24, 25];
   const branches = ['CS', 'EC', 'ME', 'AD'];
-  const branchNames = { CS: 'CSE', EC: 'ECE', ME: 'ME', AD: 'AD' };
-  const studentDocs: any[] = [];
   let serial = 1;
 
-  // B.Tech students (prefix 1): 25 per branch across years 2021-2024
-  for (const year of [21, 22, 23, 24]) {
+  for (const batch of batches) {
     for (const branch of branches) {
-      for (let s = 1; s <= 6; s++) {
-        const rollNumber = `1${year}${branch}${String(serial % 100).padStart(4, '0')}`;
-        studentDocs.push({
-          rollNumber,
-          name: `Student ${serial}`,
-          email: `student${serial}@iiitk.ac.in`,
-          passwordHash,
-          role: 'student',
-          year: 2000 + year,
-          department: (branchNames as any)[branch],
-        });
+      // 50 B.Tech students per branch per batch
+      for (let s = 1; s <= 50; s++) {
+        const rollNumber = `1${batch}${branch}${String(serial).padStart(4, '0')}`;
+        const email = `${rollNumber.toLowerCase()}@iiitk.ac.in`;
+        const identity = parseIdentity(email, rollNumber);
+        if (!identity) { serial++; continue; }
+
+        await query(
+          `INSERT INTO students (roll_number, name, email, password_hash, role, department, branch, degree_type, year_group)
+           VALUES ($1, $2, $3, $4, 'student', $5, $6, $7, $8)`,
+          [rollNumber, `Student ${serial}`, email, passwordHash, identity.branchName, identity.branch, identity.degreeType, identity.yearGroup],
+        );
         serial++;
+      }
+
+      // 2 Dual Degree students per branch per batch (except AD — no dual)
+      if (branch !== 'AD') {
+        for (let s = 1; s <= 2; s++) {
+          const rollNumber = `5${batch}${branch}${String(serial).padStart(4, '0')}`;
+          const email = `${rollNumber.toLowerCase()}@iiitk.ac.in`;
+          const identity = parseIdentity(email, rollNumber);
+          if (!identity) { serial++; continue; }
+
+          await query(
+            `INSERT INTO students (roll_number, name, email, password_hash, role, department, branch, degree_type, year_group)
+             VALUES ($1, $2, $3, $4, 'student', $5, $6, $7, $8)`,
+            [rollNumber, `DualDeg ${branch}-${s}`, email, passwordHash, identity.branchName, identity.branch, identity.degreeType, identity.yearGroup],
+          );
+          serial++;
+        }
       }
     }
   }
 
-  // Dual Degree students (prefix 5): CS, EC, ME only (not AD)
-  for (const branch of ['CS', 'EC', 'ME']) {
-    for (let s = 1; s <= 2; s++) {
-      const rollNumber = `523${branch}${String(s).padStart(4, '0')}`;
-      studentDocs.push({
-        rollNumber,
-        name: `DualDeg ${branch}-${s}`,
-        email: `dual${branch.toLowerCase()}${s}@iiitk.ac.in`,
-        passwordHash,
-        role: 'student',
-        year: 2023,
-        department: (branchNames as any)[branch],
-      });
-    }
+  // Staff and admin users (name-based emails → role: 'admin')
+  // Name-based email prefix does NOT match the roll regex → auto-detected as admin
+  const adminUsers = [
+    { roll: 'ADMIN-001', name: 'Sanjay Singh', email: 'sanjay.singh@iiitk.ac.in', role: 'admin', dept: 'Administration' },
+    { roll: 'ADMIN-002', name: 'Priya Sharma', email: 'priya.sharma@iiitk.ac.in', role: 'admin', dept: 'Administration' },
+    { roll: 'WARDEN-001', name: 'Dr. Ramesh Kumar', email: 'warden@iiitk.ac.in', role: 'admin', dept: 'Hostel Affairs' },
+    { roll: 'GUARD-001', name: 'Suresh Security', email: 'guard@iiitk.ac.in', role: 'guard', dept: 'Security' },
+    { roll: 'JUDCOMM-001', name: 'JudComm Chair', email: 'judcomm@iiitk.ac.in', role: 'judcomm', dept: 'Student Council' },
+  ];
+  for (const u of adminUsers) {
+    await query(
+      'INSERT INTO students (roll_number, name, email, password_hash, role, department) VALUES ($1, $2, $3, $4, $5, $6)',
+      [u.roll, u.name, u.email, passwordHash, u.role, u.dept],
+    );
   }
 
-  // Warden, Guard, JudComm
-  studentDocs.push(
-    { rollNumber: 'WARDEN-001', name: 'Dr. Ramesh Kumar', email: 'warden@iiitk.ac.in', passwordHash, role: 'warden', department: 'Admin' },
-    { rollNumber: 'GUARD-001', name: 'Suresh Security', email: 'guard@iiitk.ac.in', passwordHash, role: 'guard', department: 'Security' },
-    { rollNumber: 'JUDCOMM-001', name: 'JudComm Chair', email: 'judcomm@iiitk.ac.in', passwordHash, role: 'judcomm', department: 'Admin' },
-  );
-  await Student.insertMany(studentDocs);
-
   // --- Infrastructure Status ---
-  const infraDocs = hostels.map((h) => ({
-    hostelId: h._id,
-    wifiStrength: 85 + Math.floor(Math.random() * 15),
-    powerStatus: 'on' as const,
-    waterStatus: 'on' as const,
-  }));
-  await InfraStatus.insertMany(infraDocs);
+  for (const hId of hostelIds) {
+    const wifi = 85 + Math.floor(Math.random() * 15);
+    await query(
+      'INSERT INTO infra_status (hostel_id, wifi_strength, power_status, water_status) VALUES ($1, $2, $3, $4)',
+      [hId, wifi, 'on', 'on'],
+    );
+  }
 
   // --- Shared Assets ---
   const assetTemplates = [
-    { name: 'Washing Machine', category: 'laundry', totalCount: 4 },
-    { name: 'Iron Press', category: 'laundry', totalCount: 3 },
-    { name: 'Cricket Kit', category: 'sports', totalCount: 2 },
-    { name: 'Football', category: 'sports', totalCount: 5 },
-    { name: 'Badminton Set', category: 'sports', totalCount: 3 },
-    { name: 'Extension Board', category: 'electronics', totalCount: 6 },
-    { name: 'Study Table Lamp', category: 'electronics', totalCount: 8 },
+    { name: 'Washing Machine', category: 'laundry', total: 4 },
+    { name: 'Iron Press', category: 'laundry', total: 3 },
+    { name: 'Cricket Kit', category: 'sports', total: 2 },
+    { name: 'Football', category: 'sports', total: 5 },
+    { name: 'Badminton Set', category: 'sports', total: 3 },
+    { name: 'Extension Board', category: 'electronics', total: 6 },
+    { name: 'Study Table Lamp', category: 'electronics', total: 8 },
   ];
-  const assetDocs: any[] = [];
-  for (const hostel of hostels) {
-    for (const tmpl of assetTemplates) {
-      assetDocs.push({ hostelId: hostel._id, ...tmpl, availableCount: tmpl.totalCount });
+  for (const hId of hostelIds) {
+    for (const a of assetTemplates) {
+      await query(
+        'INSERT INTO assets (hostel_id, name, category, total_count, available_count) VALUES ($1, $2, $3, $4, $5)',
+        [hId, a.name, a.category, a.total, a.total],
+      );
     }
   }
-  await Asset.insertMany(assetDocs);
 
   // --- Sample Election ---
-  await Election.create({
-    title: 'Block A Representative 2026',
-    description: 'Elect your block representative for Spring 2026',
-    electionType: 'block_rep',
-    startTime: new Date(),
-    endTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-    isActive: true,
-  });
+  await query(
+    "INSERT INTO elections (title, description, election_type, start_time, end_time, is_active) VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '7 days', true)",
+    ['Block A Representative 2026', 'Elect your block representative for Spring 2026', 'block_rep'],
+  );
 
-  console.log('✅ Database seeded: 4 hostels, 200 rooms, 103 users, assets, infrastructure');
+  await ensureWaves(true);
+
+  const totalStudents = serial - 1;
+  console.log(`✅ Database seeded: 4 hostels, 200+ rooms, ${totalStudents} students, 5 waves, assets, infrastructure`);
 }

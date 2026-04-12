@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
-import Grievance from '../models/Grievance';
+import { query } from '../db/connection';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -32,17 +32,14 @@ router.post('/', authenticate, authorize('student'), async (req: AuthRequest, re
     if (!content) { res.status(400).json({ error: 'Grievance content is required.' }); return; }
 
     const { encrypted, iv, authTag } = encrypt(content);
-    const grievance = await Grievance.create({
-      studentId: req.user!.id,
-      encryptedContent: encrypted,
-      iv,
-      authTag,
-      category: category || 'general',
-    });
+    const { rows } = await query(
+      'INSERT INTO grievances (student_id, encrypted_content, iv, auth_tag, category) VALUES ($1, $2, $3, $4, $5) RETURNING id, category, status, created_at',
+      [req.user!.id, encrypted, iv, authTag, category || 'general'],
+    );
 
     res.status(201).json({
       message: 'Grievance submitted securely.',
-      grievance: { id: grievance._id, category: grievance.category, status: grievance.status, created_at: grievance.createdAt },
+      grievance: rows[0],
     });
   } catch (err) {
     console.error('Grievance submit error:', err);
@@ -51,26 +48,28 @@ router.post('/', authenticate, authorize('student'), async (req: AuthRequest, re
 });
 
 // GET /api/grievance — list all (decrypted, judcomm/warden only)
-router.get('/', authenticate, authorize('judcomm', 'warden'), async (_req: AuthRequest, res: Response) => {
+router.get('/', authenticate, authorize('judcomm', 'admin', 'warden'), async (_req: AuthRequest, res: Response) => {
   try {
-    const grievances = await Grievance.find()
-      .populate('studentId', 'name rollNumber department year')
-      .sort({ createdAt: -1 })
-      .lean();
+    const { rows } = await query(`
+      SELECT g.*, s.name, s.roll_number, s.department, s.year
+      FROM grievances g
+      JOIN students s ON s.id = g.student_id
+      ORDER BY g.created_at DESC
+    `);
 
-    const result = grievances.map((g) => {
+    const result = rows.map((g: any) => {
       let content = '[Decryption Error]';
       try {
-        content = decrypt(g.encryptedContent, g.iv, g.authTag);
+        content = decrypt(g.encrypted_content, g.iv, g.auth_tag);
       } catch {}
       return {
-        id: g._id,
-        student: g.studentId,
+        id: g.id,
+        student: { name: g.name, roll_number: g.roll_number, department: g.department, year: g.year },
         content,
         category: g.category,
         status: g.status,
-        created_at: g.createdAt,
-        resolved_at: g.resolvedAt,
+        created_at: g.created_at,
+        resolved_at: g.resolved_at,
       };
     });
 
@@ -84,16 +83,11 @@ router.get('/', authenticate, authorize('judcomm', 'warden'), async (_req: AuthR
 // GET /api/grievance/my — own grievances (status only, no content)
 router.get('/my', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const grievances = await Grievance.find({ studentId: req.user!.id })
-      .select('category status createdAt resolvedAt')
-      .sort({ createdAt: -1 })
-      .lean();
-
-    const result = grievances.map((g) => ({
-      id: g._id, category: g.category, status: g.status, created_at: g.createdAt, resolved_at: g.resolvedAt,
-    }));
-
-    res.json({ grievances: result });
+    const { rows } = await query(
+      'SELECT id, category, status, created_at, resolved_at FROM grievances WHERE student_id = $1 ORDER BY created_at DESC',
+      [req.user!.id],
+    );
+    res.json({ grievances: rows });
   } catch (err) {
     console.error('My grievances error:', err);
     res.status(500).json({ error: 'Failed to fetch grievances.' });
@@ -101,15 +95,14 @@ router.get('/my', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // PATCH /api/grievance/:id/resolve
-router.patch('/:id/resolve', authenticate, authorize('judcomm', 'warden'), async (req: AuthRequest, res: Response) => {
+router.patch('/:id/resolve', authenticate, authorize('judcomm', 'admin', 'warden'), async (req: AuthRequest, res: Response) => {
   try {
-    const grievance = await Grievance.findByIdAndUpdate(
-      req.params.id,
-      { status: 'resolved', resolvedAt: new Date() },
-      { new: true }
+    const { rows } = await query(
+      "UPDATE grievances SET status = 'resolved', resolved_at = NOW() WHERE id = $1 RETURNING id, status",
+      [req.params.id],
     );
-    if (!grievance) { res.status(404).json({ error: 'Grievance not found.' }); return; }
-    res.json({ message: 'Grievance marked as resolved.', status: grievance.status });
+    if (rows.length === 0) { res.status(404).json({ error: 'Grievance not found.' }); return; }
+    res.json({ message: 'Grievance marked as resolved.', status: rows[0].status });
   } catch (err) {
     console.error('Resolve error:', err);
     res.status(500).json({ error: 'Resolution failed.' });

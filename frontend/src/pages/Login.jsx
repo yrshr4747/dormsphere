@@ -2,6 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
+function roleHome(role) {
+  if (role === 'student') return '/student/dashboard';
+  if (role === 'guard' || role === 'warden') return '/outpass';
+  if (role === 'admin' || role === 'judcomm') return '/admin/dashboard';
+  return '/login';
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('login'); // 'login' | 'register' | 'otp'
@@ -14,6 +21,7 @@ export default function Login() {
     department: 'CSE',
     program: 'btech',
   });
+  const [profileImage, setProfileImage] = useState(null);
   const [otp, setOtp] = useState('');
   const [otpEmail, setOtpEmail] = useState('');
   const [error, setError] = useState('');
@@ -39,7 +47,7 @@ export default function Login() {
       const { data } = await api.post('/auth/login', { email: form.email, password: form.password });
       localStorage.setItem('dormsphere_token', data.token);
       localStorage.setItem('dormsphere_user', JSON.stringify(data.student));
-      navigate('/');
+      navigate(roleHome(data.student.role));
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed.');
     } finally {
@@ -53,7 +61,13 @@ export default function Login() {
     setError('');
     try {
       const { data } = await api.post('/auth/register', form);
-      if (data.requiresOTP) {
+      if (data.requiresOTP === false) {
+        // Super Admin fast-path bypass
+        setOtpEmail(data.email);
+        setSuccess('Super Admin recognized. Proceed to create account.');
+        // Directly proceed to OTP step without actually needing OTP
+        setMode('otp'); 
+      } else if (data.requiresOTP) {
         setOtpEmail(data.email);
         setMode('otp');
         setSuccess('OTP sent to your email!');
@@ -71,18 +85,22 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/verify-otp', {
-        email: otpEmail,
-        otp,
-        rollNumber: form.rollNumber,
-        name: form.name,
-        password: form.password,
-        year: form.year,
-        department: form.department,
+      // Use FormData to support Multer profileImage
+      const formData = new FormData();
+      formData.append('email', otpEmail);
+      formData.append('otp', otp);
+      formData.append('name', form.name);
+      formData.append('password', form.password);
+      if (form.rollNumber) formData.append('rollNumber', form.rollNumber);
+      if (form.designation) formData.append('designation', form.designation);
+      if (profileImage) formData.append('profileImage', profileImage);
+
+      const { data } = await api.post('/auth/verify-otp', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       localStorage.setItem('dormsphere_token', data.token);
       localStorage.setItem('dormsphere_user', JSON.stringify(data.student));
-      navigate('/');
+      navigate(roleHome(data.student.role));
     } catch (err) {
       setError(err.response?.data?.error || 'Verification failed.');
     } finally {
@@ -225,56 +243,53 @@ export default function Login() {
             )}
 
             <form onSubmit={mode === 'register' ? handleRegister : handleLogin}>
-              {mode === 'register' && (
-                <>
-                  <div className="form-group">
-                    <label className="form-label">Full Name</label>
-                    <input className="form-input" type="text" placeholder="John Doe" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Roll Number</label>
-                    <input className="form-input" type="text" placeholder="123CS0076" value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value.toUpperCase() })} required />
-                    <span style={{ fontSize: '0.7rem', color: 'var(--light-gray)', marginTop: '4px' }}>
-                      Format: 123CS0076 (B.Tech) or 523CS0001 (Dual Degree)
-                    </span>
-                  </div>
-                  <div className="grid-2">
+              {mode === 'register' && (() => {
+                const emailPrefix = (form.email || '').split('@')[0];
+                // Strict check: if the email prefix looks like a roll number OR if they haven't typed an email yet
+                const isRollFormat = /^([15])(2[1-6])(CS|EC|ME|AD)(\d{4})$/i.test(emailPrefix) || emailPrefix === '';
+                const showDesignation = !isRollFormat;
+
+                return (
+                  <>
                     <div className="form-group">
-                      <label className="form-label">Admission Year</label>
-                      <select className="form-input" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })}>
-                        <option value="2021">2021</option>
-                        <option value="2022">2022</option>
-                        <option value="2023">2023</option>
-                        <option value="2024">2024</option>
-                        <option value="2025">2025</option>
-                      </select>
+                      <label className="form-label">Full Name</label>
+                      <input className="form-input" type="text" placeholder="John Doe" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Department</label>
-                      <select className="form-input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
-                        <option value="CSE">CSE</option>
-                        <option value="ECE">ECE</option>
-                        <option value="ME">Mechanical</option>
-                        <option value="AD">AI & DS</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Program</label>
-                    <div className="flex gap-sm">
-                      <button type="button" className={`btn btn-sm w-full ${form.program === 'btech' ? 'btn-cardinal' : 'btn-ghost'}`} onClick={() => setForm({ ...form, program: 'btech' })}>
-                        B.Tech
-                      </button>
-                      <button type="button" className={`btn btn-sm w-full ${form.program === 'dual' ? 'btn-cardinal' : 'btn-ghost'}`} onClick={() => setForm({ ...form, program: 'dual' })} disabled={form.department === 'AD'}>
-                        Dual Degree
-                      </button>
-                    </div>
-                    {form.department === 'AD' && form.program === 'dual' && (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--danger)', marginTop: '4px' }}>Dual Degree not available for AI & DS</span>
+
+                    {!showDesignation ? (
+                      <div className="form-group">
+                        <label className="form-label">Roll Number</label>
+                        <input className="form-input" type="text" placeholder="123CS0076" value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value.toUpperCase() })} required />
+                        <span style={{ fontSize: '0.7rem', color: 'var(--light-gray)', marginTop: '4px' }}>
+                          Format: 123CS0076 (B.Tech) or 523CS0001 (Dual Degree)
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="form-group">
+                        <label className="form-label">Designation</label>
+                        <select className="form-input" value={form.designation || 'Student'} onChange={(e) => setForm({ ...form, designation: e.target.value })}>
+                          <option value="Student">Student (Default)</option>
+                          <option value="Warden">Warden</option>
+                          <option value="Chief Warden">Chief Warden</option>
+                          <option value="Caretaker">Caretaker</option>
+                          <option value="Staff">Staff</option>
+                        </select>
+                      </div>
                     )}
-                  </div>
-                </>
-              )}
+
+                    <div className="form-group">
+                      <label className="form-label">Profile Image (Optional)</label>
+                      <input 
+                        className="form-input" 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => setProfileImage(e.target.files[0])} 
+                        style={{ padding: '0.5rem' }} 
+                      />
+                    </div>
+                  </>
+                );
+              })()}
 
               <div className="form-group">
                 <label className="form-label">Email</label>

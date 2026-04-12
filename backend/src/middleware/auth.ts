@@ -8,6 +8,9 @@ export interface AuthRequest extends Request {
     id: string;
     role: string;
     rollNumber: string;
+    email: string;
+    name: string;
+    designation: string;
   };
 }
 
@@ -25,6 +28,9 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       id: decoded.id,
       role: decoded.role,
       rollNumber: decoded.rollNumber,
+      email: decoded.email,
+      name: decoded.name,
+      designation: decoded.designation,
     };
     next();
   } catch (err) {

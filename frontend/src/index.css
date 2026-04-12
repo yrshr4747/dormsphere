@@ -717,3 +717,84 @@ select.form-input {
 .mb-md { margin-bottom: var(--space-md); }
 .mb-lg { margin-bottom: var(--space-lg); }
 .mb-xl { margin-bottom: var(--space-xl); }
+
+/* ---- 🔥 Signal Badge (Heatmap) ---- */
+.signal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #F97316;
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.signal-badge.signal-pulse {
+  animation: signal-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes signal-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(249, 115, 22, 0.2); }
+  50% { box-shadow: 0 0 14px rgba(249, 115, 22, 0.6); }
+}
+
+.signal-btn {
+  background: none;
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: var(--radius-full);
+  width: 22px;
+  height: 22px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.signal-btn:hover {
+  background: rgba(249, 115, 22, 0.2);
+  border-color: #F97316;
+  transform: scale(1.15);
+}
+
+/* ---- Wave Status Banner ---- */
+.wave-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-xl);
+  font-size: 0.875rem;
+  font-weight: 500;
+  animation: slide-up 0.4s ease;
+}
+
+.wave-banner-open {
+  background: rgba(45, 138, 78, 0.12);
+  border: 1px solid rgba(45, 138, 78, 0.3);
+  color: var(--success-light);
+}
+
+.wave-banner-closed {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: var(--danger);
+}
+
+.wave-banner-icon {
+  font-size: 1rem;
+}
+
+.wave-banner-countdown {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--light-gray);
+  font-weight: 400;
+}

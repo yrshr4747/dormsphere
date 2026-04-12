@@ -1,22 +1,26 @@
 import { Router, Response } from 'express';
-import Student from '../models/Student';
-import LotteryRank from '../models/LotteryRank';
+import { query } from '../db/connection';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { runLottery } from '../services/engineBridge';
 
 const router = Router();
 
 // POST /api/lottery/generate — trigger lottery engine (warden only)
-router.post('/generate', authenticate, authorize('warden'), async (req: AuthRequest, res: Response) => {
+router.post('/generate', authenticate, authorize('admin'), async (req: AuthRequest, res: Response) => {
   try {
     const { seed, yearGroup } = req.body;
     const lotterySeed = seed || process.env.LOTTERY_SEED || 'public-seed-2026';
 
-    const query: any = { role: 'student' };
-    if (yearGroup) query.year = yearGroup;
+    let studentQuery = 'SELECT id, roll_number FROM students WHERE role = $1';
+    const params: any[] = ['student'];
 
-    const students = await Student.find(query).select('_id rollNumber').lean();
-    const studentIds = students.map((s) => s._id.toString());
+    if (yearGroup) {
+      studentQuery += ' AND year_group = $2';
+      params.push(yearGroup);
+    }
+
+    const { rows: students } = await query(studentQuery, params);
+    const studentIds = students.map((s: any) => s.id);
 
     if (studentIds.length === 0) {
       res.status(404).json({ error: 'No students found for lottery.' });
@@ -26,14 +30,14 @@ router.post('/generate', authenticate, authorize('warden'), async (req: AuthRequ
     const result = await runLottery(studentIds, lotterySeed);
 
     // Upsert rankings
-    const bulkOps = result.rankings.map((r: any) => ({
-      updateOne: {
-        filter: { studentId: r.student_id, seed: lotterySeed },
-        update: { studentId: r.student_id, seed: lotterySeed, hash: r.hash, rank: r.rank },
-        upsert: true,
-      },
-    }));
-    await LotteryRank.bulkWrite(bulkOps);
+    for (const r of result.rankings) {
+      await query(
+        `INSERT INTO lottery_ranks (student_id, seed, hash, rank)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (student_id, seed) DO UPDATE SET hash = $3, rank = $4`,
+        [r.student_id, lotterySeed, r.hash, r.rank],
+      );
+    }
 
     res.json({
       message: 'Lottery generated successfully.',
@@ -50,9 +54,12 @@ router.post('/generate', authenticate, authorize('warden'), async (req: AuthRequ
 // GET /api/lottery/rank
 router.get('/rank', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const rank = await LotteryRank.findOne({ studentId: req.user!.id }).sort({ createdAt: -1 }).lean();
-    if (!rank) { res.status(404).json({ error: 'No lottery rank found.' }); return; }
-    res.json({ lottery: { rank: rank.rank, hash: rank.hash, seed: rank.seed, created_at: rank.createdAt } });
+    const { rows } = await query(
+      'SELECT rank, hash, seed, created_at FROM lottery_ranks WHERE student_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [req.user!.id],
+    );
+    if (rows.length === 0) { res.status(404).json({ error: 'No lottery rank found.' }); return; }
+    res.json({ lottery: { rank: rows[0].rank, hash: rows[0].hash, seed: rows[0].seed, created_at: rows[0].created_at } });
   } catch (err) {
     console.error('Rank fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch rank.' });
@@ -62,16 +69,14 @@ router.get('/rank', authenticate, async (req: AuthRequest, res: Response) => {
 // GET /api/lottery/rankings
 router.get('/rankings', async (_req, res: Response) => {
   try {
-    const rankings = await LotteryRank.find()
-      .populate('studentId', 'rollNumber name')
-      .sort({ rank: 1 })
-      .lean();
+    const { rows } = await query(`
+      SELECT lr.rank, lr.hash, lr.seed, s.roll_number, s.name
+      FROM lottery_ranks lr
+      JOIN students s ON s.id = lr.student_id
+      ORDER BY lr.rank
+    `);
 
-    const result = rankings.map((r: any) => ({
-      rank: r.rank, hash: r.hash, seed: r.seed,
-      roll_number: r.studentId?.rollNumber, name: r.studentId?.name,
-    }));
-    res.json({ rankings: result });
+    res.json({ rankings: rows });
   } catch (err) {
     console.error('Rankings error:', err);
     res.status(500).json({ error: 'Failed to fetch rankings.' });

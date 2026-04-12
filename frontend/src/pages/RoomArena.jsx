@@ -12,10 +12,12 @@ export default function RoomArena() {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'map'
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState(null);
-  const { connected, onRoomUpdate, onDemandUpdate } = useSocket();
+  const [waveStatus, setWaveStatus] = useState(null);
+  const { connected, onRoomUpdate, onDemandUpdate, onSignalUpdate, onWaveEvent } = useSocket();
 
   useEffect(() => {
     loadRooms();
+    loadWaveStatus();
   }, []);
 
   useEffect(() => {
@@ -39,8 +41,22 @@ export default function RoomArena() {
       );
     });
 
-    return () => { unsub1?.(); unsub2?.(); };
-  }, [onRoomUpdate, onDemandUpdate]);
+    const unsub3 = onSignalUpdate((data) => {
+      setRooms((prev) =>
+        prev.map((r) =>
+          r.id === data.roomId
+            ? { ...r, signal_count: data.signalCount, demandLevel: data.demandLevel }
+            : r
+        )
+      );
+    });
+
+    const unsub4 = onWaveEvent(() => {
+      loadWaveStatus();
+    });
+
+    return () => { unsub1?.(); unsub2?.(); unsub3?.(); unsub4?.(); };
+  }, [onRoomUpdate, onDemandUpdate, onSignalUpdate, onWaveEvent]);
 
   const loadRooms = async () => {
     try {
@@ -62,6 +78,15 @@ export default function RoomArena() {
     }
   };
 
+  const loadWaveStatus = async () => {
+    try {
+      const { data } = await api.get('/rooms/waves/status');
+      setWaveStatus(data);
+    } catch (err) {
+      // Not logged in or other error — ignore silently
+    }
+  };
+
   const handleSelectRoom = async (roomId) => {
     try {
       const { data } = await api.post(`/rooms/${roomId}/attempt`);
@@ -72,6 +97,14 @@ export default function RoomArena() {
         type: 'fail',
         message: err.response?.data?.error || 'Selection failed.',
       });
+    }
+  };
+
+  const handleSignal = async (roomId) => {
+    try {
+      await api.post(`/rooms/${roomId}/signal`);
+    } catch (err) {
+      console.error('Signal error:', err);
     }
   };
 
@@ -92,6 +125,19 @@ export default function RoomArena() {
 
   return (
     <div className="page container">
+      {/* Wave Status Banner */}
+      {waveStatus && (
+        <div className={`wave-banner ${waveStatus.gateOpen ? 'wave-banner-open' : 'wave-banner-closed'}`}>
+          <span className="wave-banner-icon">{waveStatus.gateOpen ? '🟢' : '🔴'}</span>
+          <span>{waveStatus.message}</span>
+          {waveStatus.wave && !waveStatus.gateOpen && (
+            <span className="wave-banner-countdown">
+              Opens: {new Date(waveStatus.wave.gate_open).toLocaleString()}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-xl animate-slide-up">
         <div>
@@ -157,7 +203,7 @@ export default function RoomArena() {
 
       {/* Room Display */}
       {viewMode === 'grid' ? (
-        <RoomGrid rooms={filteredRooms} onSelect={handleSelectRoom} />
+        <RoomGrid rooms={filteredRooms} onSelect={handleSelectRoom} onSignal={handleSignal} />
       ) : (
         <HostelMap rooms={filteredRooms} hostels={hostels} onSelect={handleSelectRoom} />
       )}

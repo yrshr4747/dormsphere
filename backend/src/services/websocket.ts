@@ -34,13 +34,24 @@ export function broadcastRoomUpdate(io: Server, roomData: {
   io.to(`hostel:${roomData.hostelId}`).emit('room:hostel-updated', roomData);
 }
 
-// Broadcast demand signal (room popularity)
+// Broadcast demand signal (room popularity from failed attempts + interest)
 export function broadcastDemandUpdate(io: Server, data: {
   roomId: string;
   demandLevel: 'low' | 'medium' | 'high' | 'critical';
-  attemptCount: number;
+  attemptCount?: number;
+  interestCount?: number;
+  demandRatio?: number;
 }): void {
   io.emit('room:demand', data);
+}
+
+// Broadcast 🔥 heatmap signal (live interest signals)
+export function broadcastSignalUpdate(io: Server, data: {
+  roomId: string;
+  signalCount: number;
+  demandLevel: 'low' | 'medium' | 'high' | 'critical';
+}): void {
+  io.emit('room:signal', data);
 }
 
 // Broadcast wave/gate time events

@@ -6,6 +6,25 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- =====================================================
+-- ACTIVITY LOGS (Chief Warden Dashboard)
+-- =====================================================
+CREATE TABLE activity_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type VARCHAR(50) NOT NULL,
+    description TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =====================================================
+-- SYSTEM SETTINGS (KV Store)
+-- =====================================================
+CREATE TABLE sys_settings (
+    key VARCHAR(50) PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =====================================================
 -- STUDENTS
 -- =====================================================
 CREATE TABLE students (
@@ -14,10 +33,17 @@ CREATE TABLE students (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'warden', 'guard', 'judcomm')),
+    role VARCHAR(20) NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'admin', 'warden', 'guard', 'judcomm')),
     year INT CHECK (year BETWEEN 1 AND 5),
     department VARCHAR(50),
+    branch VARCHAR(2) CHECK (branch IN ('CS', 'EC', 'ME', 'AD')),
+    degree_type VARCHAR(20) CHECK (degree_type IN ('B.Tech', 'Dual Degree')),
+    year_group INT CHECK (year_group BETWEEN 1 AND 5),  -- computed: CURRENT_YEAR - batch_year
+    designation VARCHAR(100) DEFAULT 'Student',
+    profile_image_url VARCHAR(255),
     phone VARCHAR(15),
+    retention_status VARCHAR(20) DEFAULT 'none' CHECK (retention_status IN ('none', 'retained', 'released')),
+    previous_room_id UUID,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -74,6 +100,20 @@ CREATE TABLE matches (
 );
 
 -- =====================================================
+-- ROOMMATE PAIRINGS (Mutual Consent Handshakes)
+-- =====================================================
+CREATE TABLE roommate_pairings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    inviter_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    invitee_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'cancelled')),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(inviter_id, invitee_id),
+    CHECK (inviter_id <> invitee_id)
+);
+
+-- =====================================================
 -- LOTTERY RANKS
 -- =====================================================
 CREATE TABLE lottery_ranks (
@@ -117,6 +157,7 @@ CREATE TABLE waves (
     gate_open TIMESTAMP NOT NULL,
     gate_close TIMESTAMP NOT NULL,
     is_active BOOLEAN DEFAULT false,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'completed')),
     created_at TIMESTAMP DEFAULT NOW(),
     CHECK (gate_close > gate_open)
 );
@@ -222,6 +263,30 @@ CREATE TABLE asset_checkouts (
 );
 
 -- =====================================================
+-- ROOM SIGNALS (Live Heatmap 🔥)
+-- =====================================================
+CREATE TABLE room_signals (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    room_id UUID NOT NULL REFERENCES rooms(id),
+    student_id UUID NOT NULL REFERENCES students(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =====================================================
+-- OTPs (Email Verification)
+-- =====================================================
+CREATE TABLE otps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(150) NOT NULL,
+    otp VARCHAR(10) NOT NULL,
+    purpose VARCHAR(20) DEFAULT 'registration' CHECK (purpose IN ('registration', 'password_reset')),
+    expires_at TIMESTAMP NOT NULL,
+    verified BOOLEAN DEFAULT false,
+    attempts INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =====================================================
 -- MEDIA PORTAL
 -- =====================================================
 CREATE TABLE media (
@@ -232,4 +297,16 @@ CREATE TABLE media (
     url TEXT NOT NULL,
     caption VARCHAR(200),
     created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =====================================================
+-- ROOM INTEREST (Pre-Lottery Demand Tracking)
+-- =====================================================
+CREATE TABLE room_interest (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    year_group INT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(student_id, room_id)
 );

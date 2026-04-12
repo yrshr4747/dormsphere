@@ -5,42 +5,52 @@
 -- HOSTELS
 -- =====================================================
 INSERT INTO hostels (id, name, code, total_rooms, floors) VALUES
-('a0000001-0000-0000-0000-000000000001', 'MVHR Block A', 'MVHR-A', 50, 3),
-('a0000001-0000-0000-0000-000000000002', 'MVHR Block B', 'MVHR-B', 50, 3),
-('a0000001-0000-0000-0000-000000000003', 'MVHR Block C', 'MVHR-C', 50, 3),
-('a0000001-0000-0000-0000-000000000004', 'MVHR Block D', 'MVHR-D', 50, 3);
+('a0000001-0000-0000-0000-000000000001', 'MVHR Hostel', 'MVHR', 342, 9),
+('a0000001-0000-0000-0000-000000000002', 'Srinivasa Ramanujan Hall', 'SRINIVASA', 200, 5);
 
 -- =====================================================
--- ROOMS (200 rooms across 4 hostels)
+-- ROOMS
 -- =====================================================
 DO $$
 DECLARE
-    hostel_ids UUID[] := ARRAY[
-        'a0000001-0000-0000-0000-000000000001',
-        'a0000001-0000-0000-0000-000000000002',
-        'a0000001-0000-0000-0000-000000000003',
-        'a0000001-0000-0000-0000-000000000004'
-    ];
-    h_id UUID;
-    h_idx INT;
+    mvhr_id UUID := 'a0000001-0000-0000-0000-000000000001';
+    srinivasa_id UUID := 'a0000001-0000-0000-0000-000000000002';
     f INT;
     r INT;
     room_num TEXT;
 BEGIN
-    FOR h_idx IN 1..4 LOOP
-        h_id := hostel_ids[h_idx];
-        FOR f IN 1..3 LOOP
-            FOR r IN 1..17 LOOP
-                room_num := f || FORMAT('%02s', r);
-                INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available)
-                VALUES (h_id, f, room_num, 2, 0, true);
-            END LOOP;
+    ---------- MVHR Hostel (9 Floors) ----------
+    FOR f IN 1..9 LOOP
+        -- Wing A: 24 rooms/floor (101-124), Capacity: 1
+        FOR r IN 1..24 LOOP
+            room_num := f || '1' || FORMAT('%02s', r);
+            INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available)
+            VALUES (mvhr_id, f, room_num, 1, 0, true);
         END LOOP;
-        -- Add 1 extra single room per floor for odd count
-        INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available)
-        VALUES (h_id, 1, '100', 1, 0, true);
-        INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available)
-        VALUES (h_id, 2, '200', 1, 0, true);
+        
+        -- Wing B: 14 rooms/floor (201-214), Capacity: 2
+        FOR r IN 1..14 LOOP
+            room_num := f || '2' || FORMAT('%02s', r);
+            INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available)
+            VALUES (mvhr_id, f, room_num, 2, 0, true);
+        END LOOP;
+    END LOOP;
+
+    ---------- Srinivasa Ramanujan Hall (5 Floors) ----------
+    FOR f IN 1..5 LOOP
+        -- Wing A: 20 rooms/floor (101-120), Capacity: 1
+        FOR r IN 1..20 LOOP
+            room_num := f || '1' || FORMAT('%02s', r);
+            INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available)
+            VALUES (srinivasa_id, f, room_num, 1, 0, true);
+        END LOOP;
+        
+        -- Wing B: 20 rooms/floor (201-220), Capacity: 2
+        FOR r IN 1..20 LOOP
+            room_num := f || '2' || FORMAT('%02s', r);
+            INSERT INTO rooms (hostel_id, floor, room_number, capacity, occupied, is_available)
+            VALUES (srinivasa_id, f, room_num, 2, 0, true);
+        END LOOP;
     END LOOP;
 END $$;
 
@@ -85,6 +95,12 @@ BEGIN
             '{"q1":"sample","q2":"sample"}'::jsonb
         );
     END LOOP;
+
+    -- Assign a previous room ID to all Seniors (Years 3, 4, 5) simulating previous living space
+    UPDATE students
+    SET previous_room_id = (SELECT id FROM rooms ORDER BY RANDOM() LIMIT 1)
+    WHERE year >= 3;
+
 END $$;
 
 -- =====================================================

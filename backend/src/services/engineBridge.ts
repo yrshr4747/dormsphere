@@ -1,7 +1,11 @@
 import { execFile } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 
-const ENGINES_DIR = path.resolve(__dirname, '../../../engines/build');
+// In Docker the binaries live at /app/engines/build; locally at ../../engines/build
+const DOCKER_PATH = '/app/engines/build';
+const LOCAL_PATH = path.resolve(__dirname, '../../../engines/build');
+const ENGINES_DIR = fs.existsSync(DOCKER_PATH) ? DOCKER_PATH : LOCAL_PATH;
 
 interface EngineResult {
   stdout: string;

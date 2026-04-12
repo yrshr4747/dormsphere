@@ -6,7 +6,11 @@ export default function useSocket() {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const socket = io(window.location.origin, {
+    const configuredUrl = import.meta.env.VITE_SOCKET_URL
+      || import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '')
+      || window.location.origin;
+
+    const socket = io(configuredUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 10,
@@ -44,6 +48,11 @@ export default function useSocket() {
     return () => socketRef.current?.off('room:demand', callback);
   };
 
+  const onSignalUpdate = (callback) => {
+    socketRef.current?.on('room:signal', callback);
+    return () => socketRef.current?.off('room:signal', callback);
+  };
+
   const onWaveEvent = (callback) => {
     socketRef.current?.on('wave:event', callback);
     return () => socketRef.current?.off('wave:event', callback);
@@ -60,6 +69,7 @@ export default function useSocket() {
     joinHostel,
     onRoomUpdate,
     onDemandUpdate,
+    onSignalUpdate,
     onWaveEvent,
     onSelectionResult,
   };
