@@ -16,7 +16,7 @@ export default function Community() {
   const [lfForm, setLFForm] = useState({ itemType: 'lost', title: '', description: '', location: '', image: null });
 
   const user = JSON.parse(localStorage.getItem('dormsphere_user') || '{}');
-  const socket = useSocket();
+  const { socket } = useSocket();
 
   useEffect(() => {
     fetchGrievances();
