@@ -100,11 +100,13 @@ export default function AdminDashboard() {
             </p>
           </div>
         </Link>
-        <div className="glass-card text-center" style={{ opacity: 0.7, cursor: 'not-allowed' }}>
-          <div style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>⚖️</div>
-          <h4>Grievances</h4>
+        <div className="glass-card text-center" style={{ cursor: 'pointer', animationDelay: '0.3s' }} onClick={() => {
+          window.open(`${import.meta.env.VITE_API_URL || ''}/admin/export/allocations?token=${localStorage.getItem('dormsphere_token')}`, '_blank');
+        }}>
+          <div style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>📊</div>
+          <h4>Export Allocations</h4>
           <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: 'var(--space-xs)' }}>
-            Resolve student complaints
+            Download CSV Report
           </p>
         </div>
       </div>

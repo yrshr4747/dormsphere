@@ -685,4 +685,31 @@ router.post('/settings/retention', authenticate, authorize('admin'), async (req:
   }
 });
 
+// GET /api/admin/export/allocations
+router.get('/export/allocations', authenticate, authorize('admin', 'warden'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { rows } = await query(`
+      SELECT s.roll_number, s.name as student_name, s.department, s.year_group,
+             h.name as hostel_name, r.room_number, r.floor
+      FROM students s
+      JOIN room_assignments ra ON ra.student_id = s.id
+      JOIN rooms r ON ra.room_id = r.id
+      JOIN hostels h ON r.hostel_id = h.id
+      ORDER BY h.name, r.floor, r.room_number, s.year_group
+    `);
+
+    let csv = 'Roll Number,Name,Department,Year,Hostel,Room,Floor\n';
+    rows.forEach((r: any) => {
+      csv += `"${r.roll_number}","${r.student_name}","${r.department}","${r.year_group}","${r.hostel_name}","${r.room_number}","${r.floor}"\n`;
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=dormsphere_allocations.csv');
+    res.send(csv);
+  } catch (err) {
+    console.error('Export Error:', err);
+    res.status(500).json({ error: 'Failed to generate CSV export.' });
+  }
+});
+
 export default router;
