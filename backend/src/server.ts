@@ -24,6 +24,7 @@ import waveRoutes from './routes/waves';
 import roommateRoutes from './routes/roommates';
 import adminRoutes from './routes/admin';
 import mediaRoutes from './routes/media';
+import communityRoutes from './routes/community';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -102,6 +103,7 @@ app.use('/api/waves', waveRoutes);
 app.use('/api/roommates', roommateRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/community', communityRoutes);
 
 // WebSocket init
 initWebSocket(io);

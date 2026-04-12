@@ -17,6 +17,7 @@ export default function Navbar() {
     { to: '/survey', label: 'Survey', icon: '📋' },
     { to: '/outpass', label: 'Outpass', icon: '🎫' },
     { to: '/media', label: 'Media', icon: '📸' },
+    { to: '/community', label: 'Community', icon: '📢' },
     { to: '/elections', label: 'Elections', icon: '🗳️' },
   ];
 

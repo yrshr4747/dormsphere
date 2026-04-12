@@ -9,6 +9,7 @@ import Outpass from './pages/Outpass';
 import MediaPortal from './pages/MediaPortal';
 import Elections from './pages/Elections';
 import MVHRHostel from './pages/MVHRHostel';
+import Community from './pages/Community';
 
 function roleHome(role) {
   if (role === 'student') return '/student/dashboard';
@@ -74,6 +75,7 @@ export default function App() {
                     </ProtectedRoute>
                   } />
                   <Route path="/media" element={<MediaPortal />} />
+                  <Route path="/community" element={<Community />} />
                   <Route path="/elections" element={<Elections />} />
                   <Route path="/hostels/mvhr" element={<MVHRHostel />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
