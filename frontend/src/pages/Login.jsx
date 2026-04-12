@@ -62,11 +62,23 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/register', form);
       if (data.requiresOTP === false) {
-        // Super Admin fast-path bypass
+        // Super Admin fast-path bypass: Auto-verify immediately
         setOtpEmail(data.email);
-        setSuccess('Super Admin recognized. Proceed to create account.');
-        // Directly proceed to OTP step without actually needing OTP
-        setMode('otp'); 
+        setSuccess('Super Admin recognized. Entering dashboard...');
+        
+        // Construct the formData and call verify immediately
+        const formData = new FormData();
+        formData.append('email', data.email);
+        formData.append('name', form.name);
+        formData.append('password', form.password);
+        if (form.designation) formData.append('designation', form.designation);
+        
+        const verifyObj = await api.post('/auth/verify-otp', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        localStorage.setItem('dormsphere_token', verifyObj.data.token);
+        localStorage.setItem('dormsphere_user', JSON.stringify(verifyObj.data.student));
+        navigate(roleHome(verifyObj.data.student.role));
       } else if (data.requiresOTP) {
         setOtpEmail(data.email);
         setMode('otp');
