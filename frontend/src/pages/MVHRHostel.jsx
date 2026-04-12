@@ -243,15 +243,19 @@ export default function MVHRHostel() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', marginTop: '2rem' }}>
               <div style={{ background: '#FFFFFF', padding: '2rem', border: '1px solid #D5D1C4', textAlign: 'center' }}>
                 <h4 style={{ color: '#8C1515', marginBottom: '1rem' }}>A - Single Room Blueprint</h4>
-                <div style={{ width: '100%', height: '250px', border: '2px dashed #D5D1C4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8C1515', fontWeight: 'bold' }}>
-                  Floorplan Illustration
-                </div>
+                <img 
+                  src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=600&q=80" 
+                  alt="Single Room Blueprint" 
+                  style={{ width: '100%', height: '250px', objectFit: 'cover', border: '1px solid #E5E5E5' }} 
+                />
               </div>
               <div style={{ background: '#FFFFFF', padding: '2rem', border: '1px solid #D5D1C4', textAlign: 'center' }}>
                 <h4 style={{ color: '#8C1515', marginBottom: '1rem' }}>B - Double Room Blueprint</h4>
-                <div style={{ width: '100%', height: '250px', border: '2px dashed #D5D1C4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8C1515', fontWeight: 'bold' }}>
-                  Floorplan Illustration
-                </div>
+                <img 
+                  src="https://images.unsplash.com/photo-1628624747186-a941c476b7ef?auto=format&fit=crop&w=600&q=80" 
+                  alt="Double Room Blueprint" 
+                  style={{ width: '100%', height: '250px', objectFit: 'cover', border: '1px solid #E5E5E5' }} 
+                />
               </div>
             </div>
           </div>
