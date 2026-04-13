@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 
+function toLocalDateTimeInputValue(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+}
+
+function toApiDateTime(value) {
+  return value ? new Date(value).toISOString() : '';
+}
+
 export default function Elections() {
   const user = JSON.parse(localStorage.getItem('dormsphere_user') || '{}');
   const isAdmin = user.role === 'admin';
@@ -73,10 +84,10 @@ export default function Elections() {
         eligibleHostelCode: election.eligible_hostel_code || '',
         eligibleDepartment: election.eligible_department || '',
         minCgpa: election.min_cgpa || '',
-        nominationStart: election.nomination_start ? new Date(election.nomination_start).toISOString().slice(0, 16) : '',
-        nominationEnd: election.nomination_end ? new Date(election.nomination_end).toISOString().slice(0, 16) : '',
-        voteStart: election.start_time ? new Date(election.start_time).toISOString().slice(0, 16) : '',
-        voteEnd: election.end_time ? new Date(election.end_time).toISOString().slice(0, 16) : '',
+        nominationStart: toLocalDateTimeInputValue(election.nomination_start),
+        nominationEnd: toLocalDateTimeInputValue(election.nomination_end),
+        voteStart: toLocalDateTimeInputValue(election.start_time),
+        voteEnd: toLocalDateTimeInputValue(election.end_time),
       });
     } catch (err) {
       console.error('Load candidates error:', err);
@@ -95,7 +106,13 @@ export default function Elections() {
   const handleCreateElection = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/elections', createForm);
+      await api.post('/elections', {
+        ...createForm,
+        nominationStart: toApiDateTime(createForm.nominationStart),
+        nominationEnd: toApiDateTime(createForm.nominationEnd),
+        voteStart: toApiDateTime(createForm.voteStart),
+        voteEnd: toApiDateTime(createForm.voteEnd),
+      });
       setCreateForm({
         title: '',
         description: '',
@@ -144,7 +161,13 @@ export default function Elections() {
   const handleUpdateTimings = async (e) => {
     e.preventDefault();
     try {
-      await api.patch(`/elections/${selectedElectionMeta.id}`, editForm);
+      await api.patch(`/elections/${selectedElectionMeta.id}`, {
+        ...editForm,
+        nominationStart: toApiDateTime(editForm.nominationStart),
+        nominationEnd: toApiDateTime(editForm.nominationEnd),
+        voteStart: toApiDateTime(editForm.voteStart),
+        voteEnd: toApiDateTime(editForm.voteEnd),
+      });
       setMessage('Election timings updated successfully.');
       setEditingElectionId('');
       refreshSelectedElection(selectedElectionMeta.id);
