@@ -51,35 +51,58 @@ export default function Dashboard() {
     );
   }
 
-  return (
-    <div className="page container">
-      {/* Welcome Header */}
-      <div className="mb-xl animate-slide-up flex items-center gap-md">
-        {user.profileImageUrl ? (
-          <img 
-            src={user.profileImageUrl.startsWith('http') ? user.profileImageUrl : `${import.meta.env.VITE_API_URL || ''}${user.profileImageUrl}`} 
-            alt="Profile" 
-            style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--cardinal)' }}
-          />
-        ) : (
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-            {user.name?.[0]}
-          </div>
-        )}
-        <div style={{ flex: 1 }}>
-          <div className="flex justify-between items-center">
-            <h1>Welcome back, <span className="text-cardinal">{user.name || 'Student'}</span></h1>
-            <button className="btn btn-sm btn-ghost" onClick={() => setShowSettings(true)}>⚙️ Settings</button>
-          </div>
-          <p className="text-muted mt-sm">
-            {user.rollNumber} • {user.department} • Year {user.yearGroup || user.year || 1}
-          </p>
-        </div>
-      </div>
+  const profileImageSrc = user.profileImageUrl
+    ? (user.profileImageUrl.startsWith('http') ? user.profileImageUrl : `${import.meta.env.VITE_API_URL || ''}${user.profileImageUrl}`)
+    : null;
 
-      {/* Retention Card */}
+  const quickActions = [
+    { to: '/rooms', icon: '🏢', title: 'Room Selection', desc: 'Browse availability and lock in your preferred room.' },
+    { to: '/survey', icon: '📋', title: 'Personality Survey', desc: 'Keep your roommate profile fresh for better matching.' },
+    { to: '/outpass', icon: '🎫', title: 'QR Outpass', desc: 'Generate an exit pass in a few taps.' },
+    { to: '/elections', icon: '🗳️', title: 'Elections', desc: 'Track campus votes and participate on time.' },
+  ];
+
+  const statCards = [
+    { label: 'Room Status', value: assignment ? `${assignment.hostel_code} • ${assignment.room_number}` : 'Pending' },
+    { label: 'Roommate', value: roommateStatus?.activePartner ? roommateStatus.activePartner.partner_name : 'Not matched yet' },
+    { label: 'Lottery Rank', value: lottery ? `#${lottery.rank}` : 'Awaited' },
+    { label: 'Survey Match', value: match ? `${match.partnerName}` : 'Explore matches' },
+  ];
+
+  return (
+    <div className="page container dashboard-shell">
+      <section className="dashboard-hero animate-slide-up">
+        <div className="dashboard-hero-main">
+          {profileImageSrc ? (
+            <img src={profileImageSrc} alt="Profile" className="dashboard-avatar" />
+          ) : (
+            <div className="dashboard-avatar dashboard-avatar-fallback">{user.name?.[0] || 'S'}</div>
+          )}
+
+          <div className="dashboard-hero-copy">
+            <p className="dashboard-kicker">Student Command Deck</p>
+            <h1>Welcome back, <span className="text-cardinal">{user.name || 'Student'}</span></h1>
+            <p className="text-muted">{user.rollNumber} • {user.department} • Year {user.yearGroup || user.year || 1}</p>
+          </div>
+        </div>
+
+        <div className="dashboard-hero-side">
+          <button className="btn btn-sm btn-ghost" onClick={() => setShowSettings(true)}>⚙️ Settings</button>
+          <Link to="/rooms" className="btn btn-cardinal">Open Room Portal</Link>
+        </div>
+      </section>
+
+      <section className="grid-4 dashboard-stat-strip">
+        {statCards.map((card) => (
+          <div key={card.label} className="dashboard-stat-card">
+            <div className="dashboard-stat-label">{card.label}</div>
+            <div className="dashboard-stat-value">{card.value}</div>
+          </div>
+        ))}
+      </section>
+
       {retention && retention.yearGroup >= 3 && retention.retentionWindowActive && retention.retentionStatus === 'none' && retention.previousRoom && (
-        <div className="glass-card mb-xl animate-fade-in" style={{ border: '2px solid var(--accent-gold)' }}>
+        <section className="glass-card animate-fade-in dashboard-retention-banner">
           <div className="flex items-center justify-between">
             <div>
               <h3 style={{ color: 'var(--accent-gold)', marginBottom: 'var(--space-xs)' }}>🕰️ Senior Retention Required</h3>
@@ -92,16 +115,16 @@ export default function Dashboard() {
                 try {
                   await api.post('/student/retention', { action: 'release' });
                   window.location.reload();
-                } catch(e){}
+                } catch (e) {}
               }}>Enter Wave Pool</button>
-              <button 
-                className="btn btn-sm" 
+              <button
+                className="btn btn-sm"
                 style={{ background: 'var(--accent-gold)', color: '#000' }}
                 onClick={async () => {
                   try {
                     await api.post('/student/retention', { action: 'retain' });
                     window.location.reload();
-                  } catch(e) {
+                  } catch (e) {
                     alert('Error retaining room: ' + (e.response?.data?.error || e.message));
                   }
                 }}
@@ -110,187 +133,162 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Quick Action Cards */}
-      <div className="grid-4 mb-xl">
-        <Link to="/rooms" style={{ textDecoration: 'none' }}>
-          <div className="glass-card text-center" style={{ animationDelay: '0.1s' }}>
-            <div style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>🏢</div>
-            <h4>Room Selection</h4>
-            <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: 'var(--space-xs)' }}>
-              Browse & book rooms
-            </p>
+      <section>
+        <div className="dashboard-section-head">
+          <div>
+            <h3>Quick Actions</h3>
+            <p className="text-muted">Everything students usually need, without extra clicks.</p>
           </div>
-        </Link>
-        <Link to="/survey" style={{ textDecoration: 'none' }}>
-          <div className="glass-card text-center">
-            <div style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>📋</div>
-            <h4>Personality Survey</h4>
-            <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: 'var(--space-xs)' }}>
-              Find your ideal roommate
-            </p>
-          </div>
-        </Link>
-        <Link to="/outpass" style={{ textDecoration: 'none' }}>
-          <div className="glass-card text-center">
-            <div style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>🎫</div>
-            <h4>QR Outpass</h4>
-            <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: 'var(--space-xs)' }}>
-              Generate digital pass
-            </p>
-          </div>
-        </Link>
-        <Link to="/elections" style={{ textDecoration: 'none' }}>
-          <div className="glass-card text-center">
-            <div style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>🗳️</div>
-            <h4>Elections</h4>
-            <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: 'var(--space-xs)' }}>
-              Vote for representatives
-            </p>
-          </div>
-        </Link>
-      </div>
+        </div>
+        <div className="grid-4">
+          {quickActions.map((action) => (
+            <Link key={action.to} to={action.to} style={{ textDecoration: 'none' }}>
+              <div className="glass-card dashboard-action-card">
+                <div className="dashboard-action-icon">{action.icon}</div>
+                <h4>{action.title}</h4>
+                <p className="text-muted">{action.desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
 
-      {/* Status Cards */}
-      <div className="grid-3 mb-xl">
-        {/* Room Assignment */}
-        <div className="glass-card-static">
-          <div className="flex items-center justify-between mb-md">
-            <h3>🏠 Room</h3>
+      <section>
+        <div className="dashboard-section-head">
+          <div>
+            <h3>Live Snapshot</h3>
+            <p className="text-muted">Room, roommate, and lottery status at a glance.</p>
+          </div>
+        </div>
+
+        <div className="grid-3">
+          <div className="glass-card-static dashboard-panel">
+            <div className="flex items-center justify-between mb-md">
+              <h3>🏠 Room</h3>
+              {assignment ? <span className="badge badge-success">Assigned</span> : <span className="badge badge-cardinal">Pending</span>}
+            </div>
+
             {assignment ? (
-              <span className="badge badge-success">Assigned</span>
-            ) : (
-              <span className="badge badge-cardinal">Pending</span>
-            )}
-          </div>
-          {assignment ? (
-            <div>
-              <p style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-serif)' }}>
-                {assignment.hostel_code} — {assignment.room_number}
-              </p>
-              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-                Floor {assignment.floor} • {assignment.hostel_name}
-              </p>
-              <div className="progress-bar mt-md">
-                <div
-                  className="progress-fill progress-fill-cardinal"
-                  style={{ width: `${(assignment.occupied / assignment.capacity) * 100}%` }}
-                />
+              <div>
+                <p className="dashboard-panel-primary">{assignment.hostel_code} — {assignment.room_number}</p>
+                <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                  Floor {assignment.floor} • {assignment.hostel_name}
+                </p>
+                <div className="progress-bar mt-md">
+                  <div className="progress-fill progress-fill-cardinal" style={{ width: `${(assignment.occupied / assignment.capacity) * 100}%` }} />
+                </div>
+                <p className="text-muted mt-sm" style={{ fontSize: '0.75rem' }}>{assignment.occupied}/{assignment.capacity} occupants</p>
               </div>
-              <p className="text-muted mt-sm" style={{ fontSize: '0.75rem' }}>
-                {assignment.occupied}/{assignment.capacity} occupants
-              </p>
-            </div>
-          ) : (
-            <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-              No room assigned yet. <Link to="/rooms" className="text-cardinal">Select a room →</Link>
-            </p>
-          )}
-        </div>
-
-        {/* Roommate Network */}
-        <div className="glass-card-static">
-          <div className="flex items-center justify-between mb-md">
-            <h3>👥 Mutual Roommate</h3>
-          </div>
-          <div className="flex flex-col gap-sm" style={{ minHeight: '120px' }}>
-            {roommateStatus?.activePartner ? (
-              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-                Connected with <span className="text-cardinal">{roommateStatus.activePartner.partner_name}</span> ({roommateStatus.activePartner.partner_roll})
-              </p>
             ) : (
-              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-                Pending requests or active handshakes appear here.
+              <p className="text-muted" style={{ fontSize: '0.9rem' }}>
+                No room assigned yet. <Link to="/rooms" className="text-cardinal">Select a room →</Link>
               </p>
             )}
-            {(roommateStatus?.incomingRequests?.length || 0) > 0 && (
-              <div className="flex flex-col gap-sm">
-                {roommateStatus.incomingRequests.map((request) => (
-                  <div key={request.id} style={{ fontSize: '0.8rem' }}>
-                    <span>{request.inviter_name} ({request.inviter_roll})</span>
-                    <div className="flex gap-sm mt-sm">
-                      <button className="btn btn-sm btn-cardinal" onClick={async () => {
-                        await api.post('/roommates/respond', { pairingId: request.id, action: 'accept' });
-                        await refreshRoommates();
-                      }}>Accept</button>
-                      <button className="btn btn-sm btn-ghost" onClick={async () => {
-                        await api.post('/roommates/respond', { pairingId: request.id, action: 'reject' });
-                        await refreshRoommates();
-                      }}>Reject</button>
+          </div>
+
+          <div className="glass-card-static dashboard-panel">
+            <div className="flex items-center justify-between mb-md">
+              <h3>👥 Mutual Roommate</h3>
+              <Link to="/survey-matches" className="text-cardinal" style={{ fontSize: '0.8rem' }}>Top 5 Matches</Link>
+            </div>
+
+            <div className="flex flex-col gap-sm" style={{ minHeight: '120px' }}>
+              {roommateStatus?.activePartner ? (
+                <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                  Connected with <span className="text-cardinal">{roommateStatus.activePartner.partner_name}</span> ({roommateStatus.activePartner.partner_roll})
+                </p>
+              ) : (
+                <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                  Pending requests or active handshakes appear here.
+                </p>
+              )}
+
+              {(roommateStatus?.incomingRequests?.length || 0) > 0 && (
+                <div className="flex flex-col gap-sm">
+                  {roommateStatus.incomingRequests.map((request) => (
+                    <div key={request.id} className="dashboard-request-card">
+                      <span>{request.inviter_name} ({request.inviter_roll})</span>
+                      <div className="flex gap-sm mt-sm">
+                        <button className="btn btn-sm btn-cardinal" onClick={async () => {
+                          await api.post('/roommates/respond', { pairingId: request.id, action: 'accept' });
+                          await refreshRoommates();
+                        }}>Accept</button>
+                        <button className="btn btn-sm btn-ghost" onClick={async () => {
+                          await api.post('/roommates/respond', { pairingId: request.id, action: 'reject' });
+                          await refreshRoommates();
+                        }}>Reject</button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-sm mt-auto">
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Roll Number"
+                  style={{ flex: 1, padding: '0.4rem' }}
+                  value={inviteRoll}
+                  onChange={(e) => setInviteRoll(e.target.value.toUpperCase())}
+                />
+                <button className="btn btn-sm btn-cardinal" onClick={async () => {
+                  try {
+                    if (!inviteRoll) return;
+                    await api.post('/roommates/invite', { rollNumber: inviteRoll });
+                    setInviteRoll('');
+                    await refreshRoommates();
+                  } catch (e) {
+                    alert(e.response?.data?.error || 'Invitation failed.');
+                  }
+                }}>Invite</button>
               </div>
-            )}
-            <div className="flex gap-sm mt-auto">
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Roll Number"
-                style={{ flex: 1, padding: '0.4rem' }}
-                value={inviteRoll}
-                onChange={(e) => setInviteRoll(e.target.value.toUpperCase())}
-              />
-              <button className="btn btn-sm btn-cardinal" onClick={async () => {
-                try {
-                  if (!inviteRoll) return;
-                  await api.post('/roommates/invite', { rollNumber: inviteRoll });
-                  setInviteRoll('');
-                  await refreshRoommates();
-                } catch(e) {
-                  alert(e.response?.data?.error || 'Invitation failed.');
-                }
-              }}>Invite</button>
-            </div>
-            {(roommateStatus?.outgoingRequests?.length || 0) > 0 && (
-              <p className="text-muted" style={{ fontSize: '0.75rem' }}>
-                Pending outgoing: {roommateStatus.outgoingRequests.map((r) => `${r.invitee_name} (${r.invitee_roll})`).join(', ')}
-              </p>
-            )}
-            <p className="text-muted text-center" style={{ fontSize: '0.8rem', marginTop: 'var(--space-xs)' }}>
-              Check <Link to="/survey-matches" className="text-cardinal">survey matches</Link> to find peers.
-            </p>
-          </div>
-        </div>
 
-        {/* Lottery Rank */}
-        <div className="glass-card-static">
-          <div className="flex items-center justify-between mb-md">
-            <h3>🎲 Lottery</h3>
+              {(roommateStatus?.outgoingRequests?.length || 0) > 0 && (
+                <p className="text-muted" style={{ fontSize: '0.75rem' }}>
+                  Pending outgoing: {roommateStatus.outgoingRequests.map((r) => `${r.invitee_name} (${r.invitee_roll})`).join(', ')}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="glass-card-static dashboard-panel">
+            <div className="flex items-center justify-between mb-md">
+              <h3>🎲 Lottery</h3>
+              {lottery ? <span className="badge badge-success">Ranked</span> : <span className="badge badge-cardinal">Pending</span>}
+            </div>
             {lottery ? (
-              <span className="badge badge-success">Ranked</span>
+              <div className="stat-card dashboard-lottery-highlight">
+                <div className="stat-value">#{lottery.rank}</div>
+                <div className="stat-label">Your Selection Priority</div>
+                <p className="text-muted mt-md" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>
+                  Hash: {lottery.hash?.slice(0, 16)}...
+                </p>
+              </div>
             ) : (
-              <span className="badge badge-cardinal">Pending</span>
+              <p className="text-muted" style={{ fontSize: '0.9rem' }}>
+                Lottery not generated yet. Check back later.
+              </p>
             )}
           </div>
-          {lottery ? (
-            <div className="stat-card">
-              <div className="stat-value">#{lottery.rank}</div>
-              <div className="stat-label">Your Selection Priority</div>
-              <p className="text-muted mt-md" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>
-                Hash: {lottery.hash?.slice(0, 16)}...
-              </p>
-            </div>
-          ) : (
-            <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-              Lottery not generated yet. Check back later.
-            </p>
-          )}
         </div>
-      </div>
+      </section>
 
-      {/* Infrastructure Status */}
       {infra.length > 0 && (
-        <div className="glass-card-static">
-          <h3 className="mb-lg">🔌 Campus Infrastructure</h3>
+        <section className="glass-card-static">
+          <div className="dashboard-section-head dashboard-section-head-compact">
+            <div>
+              <h3>🔌 Campus Infrastructure</h3>
+              <p className="text-muted">Live utility visibility across your hostel blocks.</p>
+            </div>
+          </div>
+
           <div className="grid-4">
             {infra.map((block) => (
-              <div key={block.id} style={{
-                padding: 'var(--space-md)', borderRadius: 'var(--radius-md)',
-                background: 'rgba(15,14,13,0.4)', border: '1px solid var(--border)',
-              }}>
+              <div key={block.id} className="dashboard-infra-card">
                 <h4 style={{ fontSize: '0.9rem', marginBottom: 'var(--space-sm)' }}>
                   {block.hostel_name.includes('MVHR') ? (
                     <Link to="/hostels/mvhr" className="text-cardinal" style={{ textDecoration: 'none' }}>
@@ -308,24 +306,18 @@ export default function Dashboard() {
                       style={{ width: `${block.wifi_strength}%` }}
                     />
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--light-gray)' }}>
-                    {block.wifi_strength}%
-                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--light-gray)' }}>{block.wifi_strength}%</span>
                 </div>
                 <div className="flex items-center gap-sm">
                   <span>⚡</span>
-                  <span className={`badge ${block.power_status === 'on' ? 'badge-success' : 'badge-danger'}`}>
-                    {block.power_status}
-                  </span>
+                  <span className={`badge ${block.power_status === 'on' ? 'badge-success' : 'badge-danger'}`}>{block.power_status}</span>
                   <span>💧</span>
-                  <span className={`badge ${block.water_status === 'on' ? 'badge-success' : 'badge-danger'}`}>
-                    {block.water_status}
-                  </span>
+                  <span className={`badge ${block.water_status === 'on' ? 'badge-success' : 'badge-danger'}`}>{block.water_status}</span>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {showSettings && <SettingsModal user={user} onClose={() => setShowSettings(false)} />}
