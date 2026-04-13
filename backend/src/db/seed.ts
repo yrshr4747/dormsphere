@@ -6,6 +6,10 @@ export async function seedDatabase(): Promise<void> {
   await query(`
     ALTER TABLE elections ADD COLUMN IF NOT EXISTS nomination_start TIMESTAMP;
     ALTER TABLE elections ADD COLUMN IF NOT EXISTS nomination_end TIMESTAMP;
+    ALTER TABLE elections ADD COLUMN IF NOT EXISTS eligible_year_group INT;
+    ALTER TABLE elections ADD COLUMN IF NOT EXISTS eligible_hostel_code VARCHAR(10);
+    ALTER TABLE elections ADD COLUMN IF NOT EXISTS eligible_department VARCHAR(50);
+    ALTER TABLE elections ADD COLUMN IF NOT EXISTS min_cgpa DECIMAL(4,2);
     ALTER TABLE candidates ADD COLUMN IF NOT EXISTS cgpa DECIMAL(4,2);
     ALTER TABLE candidates ADD COLUMN IF NOT EXISTS nomination_created_at TIMESTAMP DEFAULT NOW();
   `);

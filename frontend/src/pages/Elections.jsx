@@ -17,6 +17,10 @@ export default function Elections() {
     title: '',
     description: '',
     electionType: 'block_rep',
+    eligibleYearGroup: '',
+    eligibleHostelCode: '',
+    eligibleDepartment: '',
+    minCgpa: '',
     nominationStart: '',
     nominationEnd: '',
     voteStart: '',
@@ -27,6 +31,17 @@ export default function Elections() {
     cgpa: '',
     manifesto: '',
   });
+  const [editForm, setEditForm] = useState({
+    eligibleYearGroup: '',
+    eligibleHostelCode: '',
+    eligibleDepartment: '',
+    minCgpa: '',
+    nominationStart: '',
+    nominationEnd: '',
+    voteStart: '',
+    voteEnd: '',
+  });
+  const [editingElectionId, setEditingElectionId] = useState('');
 
   useEffect(() => {
     loadElections();
@@ -52,6 +67,17 @@ export default function Elections() {
       const resultData = await api.get(`/elections/${election.id}/results`);
       setResults(resultData.data);
       setMessage('');
+      setEditingElectionId('');
+      setEditForm({
+        eligibleYearGroup: election.eligible_year_group || '',
+        eligibleHostelCode: election.eligible_hostel_code || '',
+        eligibleDepartment: election.eligible_department || '',
+        minCgpa: election.min_cgpa || '',
+        nominationStart: election.nomination_start ? new Date(election.nomination_start).toISOString().slice(0, 16) : '',
+        nominationEnd: election.nomination_end ? new Date(election.nomination_end).toISOString().slice(0, 16) : '',
+        voteStart: election.start_time ? new Date(election.start_time).toISOString().slice(0, 16) : '',
+        voteEnd: election.end_time ? new Date(election.end_time).toISOString().slice(0, 16) : '',
+      });
     } catch (err) {
       console.error('Load candidates error:', err);
     }
@@ -74,6 +100,10 @@ export default function Elections() {
         title: '',
         description: '',
         electionType: 'block_rep',
+        eligibleYearGroup: '',
+        eligibleHostelCode: '',
+        eligibleDepartment: '',
+        minCgpa: '',
         nominationStart: '',
         nominationEnd: '',
         voteStart: '',
@@ -108,6 +138,32 @@ export default function Elections() {
       refreshSelectedElection(selectedElection.id);
     } catch (err) {
       alert(err.response?.data?.error || 'Vote failed.');
+    }
+  };
+
+  const handleUpdateTimings = async (e) => {
+    e.preventDefault();
+    try {
+      await api.patch(`/elections/${selectedElectionMeta.id}`, editForm);
+      setMessage('Election timings updated successfully.');
+      setEditingElectionId('');
+      refreshSelectedElection(selectedElectionMeta.id);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update election.');
+    }
+  };
+
+  const handleDeleteElection = async () => {
+    if (!window.confirm('Delete this election and all its nominations/votes?')) return;
+    try {
+      await api.delete(`/elections/${selectedElectionMeta.id}`);
+      setMessage('Election deleted successfully.');
+      setSelectedElection(null);
+      setCandidates([]);
+      setResults(null);
+      loadElections();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete election.');
     }
   };
 
@@ -164,6 +220,47 @@ export default function Elections() {
             <div className="form-group">
               <label className="form-label">Description</label>
               <textarea className="form-input" rows="3" value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} />
+            </div>
+
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Eligible Year Group</label>
+                <select className="form-input" value={createForm.eligibleYearGroup} onChange={(e) => setCreateForm({ ...createForm, eligibleYearGroup: e.target.value })}>
+                  <option value="">All Years</option>
+                  <option value="1">Year 1</option>
+                  <option value="2">Year 2</option>
+                  <option value="3">Year 3</option>
+                  <option value="4">Year 4</option>
+                  <option value="5">Year 5</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Eligible Hostel</label>
+                <select className="form-input" value={createForm.eligibleHostelCode} onChange={(e) => setCreateForm({ ...createForm, eligibleHostelCode: e.target.value })}>
+                  <option value="">All Hostels</option>
+                  <option value="MVHR-A">MVHR-A</option>
+                  <option value="MVHR-B">MVHR-B</option>
+                  <option value="MVHR-C">MVHR-C</option>
+                  <option value="MVHR-D">MVHR-D</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Eligible Department</label>
+                <select className="form-input" value={createForm.eligibleDepartment} onChange={(e) => setCreateForm({ ...createForm, eligibleDepartment: e.target.value })}>
+                  <option value="">All Departments</option>
+                  <option value="Computer Science">Computer Science</option>
+                  <option value="Electronics & Communication">Electronics & Communication</option>
+                  <option value="Mechanical Engineering">Mechanical Engineering</option>
+                  <option value="Artificial Intelligence & Data Science">Artificial Intelligence & Data Science</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Minimum CGPA</label>
+                <input type="number" className="form-input" min="0" max="10" step="0.01" value={createForm.minCgpa} onChange={(e) => setCreateForm({ ...createForm, minCgpa: e.target.value })} placeholder="Optional" />
+              </div>
             </div>
 
             <div className="grid-2">
@@ -234,11 +331,32 @@ export default function Elections() {
                 <h3>{selectedElectionMeta.title}</h3>
                 <p className="text-muted mt-sm">{selectedElectionMeta.description}</p>
               </div>
-              <span className={`badge ${phaseColors[selectedElectionMeta.phase] || 'badge-cardinal'}`}>{selectedElectionMeta.phase}</span>
+              <div className="flex gap-sm items-center">
+                <span className={`badge ${phaseColors[selectedElectionMeta.phase] || 'badge-cardinal'}`}>{selectedElectionMeta.phase}</span>
+                {isAdmin && (
+                  <>
+                    <button className="btn btn-sm btn-ghost" onClick={() => setEditingElectionId(selectedElectionMeta.id)}>
+                      Edit Timings
+                    </button>
+                    <button className="btn btn-sm btn-ghost" onClick={handleDeleteElection}>
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="grid-2">
               <div className="text-muted" style={{ fontSize: '0.85rem' }}>
+                {(selectedElectionMeta.eligible_year_group || selectedElectionMeta.eligible_hostel_code || selectedElectionMeta.eligible_department || selectedElectionMeta.min_cgpa) && (
+                  <p>
+                    Eligibility:
+                    {selectedElectionMeta.eligible_year_group ? ` Year ${selectedElectionMeta.eligible_year_group}` : ' All years'}
+                    {selectedElectionMeta.eligible_hostel_code ? ` • ${selectedElectionMeta.eligible_hostel_code}` : ''}
+                    {selectedElectionMeta.eligible_department ? ` • ${selectedElectionMeta.eligible_department}` : ''}
+                    {selectedElectionMeta.min_cgpa ? ` • Min CGPA ${selectedElectionMeta.min_cgpa}` : ''}
+                  </p>
+                )}
                 {selectedElectionMeta.nomination_start && (
                   <p>Nomination Window: {new Date(selectedElectionMeta.nomination_start).toLocaleString()} to {new Date(selectedElectionMeta.nomination_end).toLocaleString()}</p>
                 )}
@@ -250,6 +368,77 @@ export default function Elections() {
               </div>
             </div>
           </div>
+
+          {isAdmin && editingElectionId === selectedElectionMeta.id && (
+            <div className="glass-card-static mb-xl">
+              <h3 className="mb-lg">Update Election Timings</h3>
+              <form onSubmit={handleUpdateTimings}>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Eligible Year Group</label>
+                    <select className="form-input" value={editForm.eligibleYearGroup} onChange={(e) => setEditForm({ ...editForm, eligibleYearGroup: e.target.value })}>
+                      <option value="">All Years</option>
+                      <option value="1">Year 1</option>
+                      <option value="2">Year 2</option>
+                      <option value="3">Year 3</option>
+                      <option value="4">Year 4</option>
+                      <option value="5">Year 5</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Eligible Hostel</label>
+                    <select className="form-input" value={editForm.eligibleHostelCode} onChange={(e) => setEditForm({ ...editForm, eligibleHostelCode: e.target.value })}>
+                      <option value="">All Hostels</option>
+                      <option value="MVHR-A">MVHR-A</option>
+                      <option value="MVHR-B">MVHR-B</option>
+                      <option value="MVHR-C">MVHR-C</option>
+                      <option value="MVHR-D">MVHR-D</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Eligible Department</label>
+                    <select className="form-input" value={editForm.eligibleDepartment} onChange={(e) => setEditForm({ ...editForm, eligibleDepartment: e.target.value })}>
+                      <option value="">All Departments</option>
+                      <option value="Computer Science">Computer Science</option>
+                      <option value="Electronics & Communication">Electronics & Communication</option>
+                      <option value="Mechanical Engineering">Mechanical Engineering</option>
+                      <option value="Artificial Intelligence & Data Science">Artificial Intelligence & Data Science</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Minimum CGPA</label>
+                    <input type="number" className="form-input" min="0" max="10" step="0.01" value={editForm.minCgpa} onChange={(e) => setEditForm({ ...editForm, minCgpa: e.target.value })} placeholder="Optional" />
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Nomination Start</label>
+                    <input type="datetime-local" className="form-input" value={editForm.nominationStart} onChange={(e) => setEditForm({ ...editForm, nominationStart: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Nomination End</label>
+                    <input type="datetime-local" className="form-input" value={editForm.nominationEnd} onChange={(e) => setEditForm({ ...editForm, nominationEnd: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Voting Start</label>
+                    <input type="datetime-local" className="form-input" value={editForm.voteStart} onChange={(e) => setEditForm({ ...editForm, voteStart: e.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Voting End</label>
+                    <input type="datetime-local" className="form-input" value={editForm.voteEnd} onChange={(e) => setEditForm({ ...editForm, voteEnd: e.target.value })} required />
+                  </div>
+                </div>
+                <div className="flex gap-sm">
+                  <button className="btn btn-cardinal">Save Timings</button>
+                  <button type="button" className="btn btn-ghost" onClick={() => setEditingElectionId('')}>Cancel</button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {message && (
             <div className="glass-card-static mb-xl" style={{ border: '1px solid rgba(45,138,78,0.35)' }}>

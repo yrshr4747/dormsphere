@@ -4,6 +4,36 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+async function getStudentElectionProfile(studentId: string) {
+  const { rows } = await query(`
+    SELECT s.id, s.year_group, s.department, h.code AS hostel_code
+    FROM students s
+    LEFT JOIN room_assignments ra ON ra.student_id = s.id
+    LEFT JOIN rooms r ON r.id = ra.room_id
+    LEFT JOIN hostels h ON h.id = r.hostel_id
+    WHERE s.id = $1
+  `, [studentId]);
+
+  return rows[0] || null;
+}
+
+function getEligibilityFailure(election: any, student: any, cgpa?: number | null): string | null {
+  if (!student) return 'Student record not found.';
+  if (election.eligible_year_group && student.year_group !== election.eligible_year_group) {
+    return `Only Year ${election.eligible_year_group} students are eligible for this election.`;
+  }
+  if (election.eligible_department && student.department !== election.eligible_department) {
+    return `Only ${election.eligible_department} students are eligible for this election.`;
+  }
+  if (election.eligible_hostel_code && student.hostel_code !== election.eligible_hostel_code) {
+    return `Only students from ${election.eligible_hostel_code} are eligible for this election.`;
+  }
+  if (cgpa !== undefined && cgpa !== null && election.min_cgpa && cgpa < parseFloat(election.min_cgpa)) {
+    return `Minimum CGPA required is ${election.min_cgpa}.`;
+  }
+  return null;
+}
+
 function getElectionPhase(election: any): 'nomination' | 'voting' | 'closed' | 'upcoming' {
   const now = new Date();
   const nominationStart = election.nomination_start ? new Date(election.nomination_start) : null;
@@ -48,6 +78,10 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       title: e.title,
       description: e.description,
       election_type: e.election_type,
+      eligible_year_group: e.eligible_year_group,
+      eligible_hostel_code: e.eligible_hostel_code,
+      eligible_department: e.eligible_department,
+      min_cgpa: e.min_cgpa,
       nomination_start: e.nomination_start,
       nomination_end: e.nomination_end,
       start_time: e.start_time,
@@ -70,7 +104,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 // POST /api/elections
 router.post('/', authenticate, authorize('admin'), async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description, electionType, nominationStart, nominationEnd, voteStart, voteEnd } = req.body;
+    const { title, description, electionType, eligibleYearGroup, eligibleHostelCode, eligibleDepartment, minCgpa, nominationStart, nominationEnd, voteStart, voteEnd } = req.body;
     if (!title || !electionType || !voteStart || !voteEnd) {
       res.status(400).json({ error: 'Title, type, vote start, and vote end are required.' });
       return;
@@ -80,6 +114,7 @@ router.post('/', authenticate, authorize('admin'), async (req: AuthRequest, res:
     const voteEndDate = new Date(voteEnd);
     const nominationStartDate = nominationStart ? new Date(nominationStart) : null;
     const nominationEndDate = nominationEnd ? new Date(nominationEnd) : null;
+    const minCgpaValue = minCgpa !== '' && minCgpa !== undefined && minCgpa !== null ? parseFloat(minCgpa) : null;
 
     if (Number.isNaN(voteStartDate.getTime()) || Number.isNaN(voteEndDate.getTime()) || voteEndDate <= voteStartDate) {
       res.status(400).json({ error: 'Voting start and end times must be valid, and end must be after start.' });
@@ -96,16 +131,112 @@ router.post('/', authenticate, authorize('admin'), async (req: AuthRequest, res:
       return;
     }
 
+    if (minCgpaValue !== null && (Number.isNaN(minCgpaValue) || minCgpaValue < 0 || minCgpaValue > 10)) {
+      res.status(400).json({ error: 'Minimum CGPA must be between 0 and 10.' });
+      return;
+    }
+
     const { rows } = await query(`
-      INSERT INTO elections (title, description, election_type, nomination_start, nomination_end, start_time, end_time, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+      INSERT INTO elections (title, description, election_type, eligible_year_group, eligible_hostel_code, eligible_department, min_cgpa, nomination_start, nomination_end, start_time, end_time, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)
       RETURNING id
-    `, [title, description || null, electionType, nominationStartDate, nominationEndDate, voteStartDate, voteEndDate]);
+    `, [
+      title,
+      description || null,
+      electionType,
+      eligibleYearGroup || null,
+      eligibleHostelCode || null,
+      eligibleDepartment || null,
+      minCgpaValue,
+      nominationStartDate,
+      nominationEndDate,
+      voteStartDate,
+      voteEndDate,
+    ]);
 
     res.status(201).json({ message: 'Election created successfully.', electionId: rows[0].id });
   } catch (err) {
     console.error('Create election error:', err);
     res.status(500).json({ error: 'Failed to create election.' });
+  }
+});
+
+// PATCH /api/elections/:id
+router.patch('/:id', authenticate, authorize('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { eligibleYearGroup, eligibleHostelCode, eligibleDepartment, minCgpa, nominationStart, nominationEnd, voteStart, voteEnd } = req.body;
+
+    const { rows: electionRows } = await query('SELECT id FROM elections WHERE id = $1', [req.params.id]);
+    if (electionRows.length === 0) {
+      res.status(404).json({ error: 'Election not found.' });
+      return;
+    }
+
+    const voteStartDate = new Date(voteStart);
+    const voteEndDate = new Date(voteEnd);
+    const nominationStartDate = nominationStart ? new Date(nominationStart) : null;
+    const nominationEndDate = nominationEnd ? new Date(nominationEnd) : null;
+    const minCgpaValue = minCgpa !== '' && minCgpa !== undefined && minCgpa !== null ? parseFloat(minCgpa) : null;
+
+    if (Number.isNaN(voteStartDate.getTime()) || Number.isNaN(voteEndDate.getTime()) || voteEndDate <= voteStartDate) {
+      res.status(400).json({ error: 'Voting start and end times must be valid, and end must be after start.' });
+      return;
+    }
+
+    if ((nominationStartDate && Number.isNaN(nominationStartDate.getTime())) || (nominationEndDate && Number.isNaN(nominationEndDate.getTime()))) {
+      res.status(400).json({ error: 'Nomination timings must be valid.' });
+      return;
+    }
+
+    if (nominationStartDate && nominationEndDate && nominationEndDate > voteStartDate) {
+      res.status(400).json({ error: 'Nomination window must close before voting starts.' });
+      return;
+    }
+
+    if (minCgpaValue !== null && (Number.isNaN(minCgpaValue) || minCgpaValue < 0 || minCgpaValue > 10)) {
+      res.status(400).json({ error: 'Minimum CGPA must be between 0 and 10.' });
+      return;
+    }
+
+    await query(
+      `UPDATE elections
+       SET eligible_year_group = $1, eligible_hostel_code = $2, eligible_department = $3, min_cgpa = $4,
+           nomination_start = $5, nomination_end = $6, start_time = $7, end_time = $8
+       WHERE id = $9`,
+      [
+        eligibleYearGroup || null,
+        eligibleHostelCode || null,
+        eligibleDepartment || null,
+        minCgpaValue,
+        nominationStartDate,
+        nominationEndDate,
+        voteStartDate,
+        voteEndDate,
+        req.params.id,
+      ],
+    );
+
+    res.json({ message: 'Election timings updated successfully.' });
+  } catch (err) {
+    console.error('Update election error:', err);
+    res.status(500).json({ error: 'Failed to update election timings.' });
+  }
+});
+
+// DELETE /api/elections/:id
+router.delete('/:id', authenticate, authorize('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { rows } = await query('SELECT id FROM elections WHERE id = $1', [req.params.id]);
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'Election not found.' });
+      return;
+    }
+
+    await query('DELETE FROM elections WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Election deleted successfully.' });
+  } catch (err) {
+    console.error('Delete election error:', err);
+    res.status(500).json({ error: 'Failed to delete election.' });
   }
 });
 
@@ -119,6 +250,7 @@ router.post('/:id/nominate', authenticate, authorize('student'), async (req: Aut
     }
 
     const election = electionRows[0];
+    const student = await getStudentElectionProfile(req.user!.id);
     const now = new Date();
     const nominationStart = election.nomination_start ? new Date(election.nomination_start) : null;
     const nominationEnd = election.nomination_end ? new Date(election.nomination_end) : null;
@@ -137,6 +269,12 @@ router.post('/:id/nominate', authenticate, authorize('student'), async (req: Aut
     const cgpaValue = parseFloat(cgpa);
     if (Number.isNaN(cgpaValue) || cgpaValue < 0 || cgpaValue > 10) {
       res.status(400).json({ error: 'CGPA must be between 0 and 10.' });
+      return;
+    }
+
+    const eligibilityFailure = getEligibilityFailure(election, student, cgpaValue);
+    if (eligibilityFailure) {
+      res.status(403).json({ error: eligibilityFailure });
       return;
     }
 
@@ -190,9 +328,16 @@ router.post('/vote', authenticate, authorize('student'), async (req: AuthRequest
     }
 
     const election = electionRows[0];
+    const student = await getStudentElectionProfile(req.user!.id);
     const now = new Date();
     if (now < new Date(election.start_time) || now > new Date(election.end_time)) {
       res.status(400).json({ error: 'Voting is not currently open for this election.' });
+      return;
+    }
+
+    const eligibilityFailure = getEligibilityFailure(election, student, null);
+    if (eligibilityFailure) {
+      res.status(403).json({ error: eligibilityFailure });
       return;
     }
 
