@@ -14,11 +14,13 @@ const router = Router();
 router.get('/lost-found', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { rows } = await query(`
-      SELECT lf.id, lf.item_type, lf.title, lf.description, lf.location, lf.image_url, 
+      SELECT lf.id, lf.item_type, lf.title, lf.description, lf.location, lf.image_url,
+             lf.reported_by,
              lf.status, lf.created_at, 
              s.name as reporter_name, s.roll_number as reporter_roll, s.email as reporter_email
       FROM lost_and_found lf
       JOIN students s ON lf.reported_by = s.id
+      WHERE lf.status != 'resolved'
       ORDER BY lf.created_at DESC
     `);
     res.json({ items: rows });

@@ -4,6 +4,7 @@ import useSocket from '../hooks/useSocket';
 
 export default function Community() {
   const [activeTab, setActiveTab] = useState('grievances'); // 'grievances' or 'lostfound'
+  const [grievanceSort, setGrievanceSort] = useState('upvotes');
   
   // Grievance State
   const [grievances, setGrievances] = useState([]);
@@ -123,6 +124,16 @@ export default function Community() {
     }
   };
 
+  const sortedGrievances = [...grievances].sort((a, b) => {
+    if (grievanceSort === 'recent') {
+      return new Date(b.created_at) - new Date(a.created_at);
+    }
+
+    const upvoteDiff = Number(b.upvotes || 0) - Number(a.upvotes || 0);
+    if (upvoteDiff !== 0) return upvoteDiff;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+
   return (
     <div className="page container">
       <div className="flex justify-between items-center mb-xl animate-slide-up">
@@ -147,9 +158,20 @@ export default function Community() {
         <div className="animate-slide-up">
           <div className="flex justify-between items-center mb-md">
             <h3 className="text-gold">Campus Grievances</h3>
-            <button className="btn btn-outline" onClick={() => setShowGrievanceForm(!showGrievanceForm)}>
-              + Write Grievance
-            </button>
+            <div className="flex gap-sm" style={{ alignItems: 'center' }}>
+              <select
+                className="form-input"
+                value={grievanceSort}
+                onChange={(e) => setGrievanceSort(e.target.value)}
+                style={{ minWidth: '170px' }}
+              >
+                <option value="upvotes">Most Upvoted</option>
+                <option value="recent">Most Recent</option>
+              </select>
+              <button className="btn btn-outline" onClick={() => setShowGrievanceForm(!showGrievanceForm)}>
+                + Write Grievance
+              </button>
+            </div>
           </div>
 
           {showGrievanceForm && (
@@ -188,8 +210,8 @@ export default function Community() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {grievances.length === 0 && <p className="text-muted">No grievances reported yet.</p>}
-            {grievances.map(g => (
+            {sortedGrievances.length === 0 && <p className="text-muted">No grievances reported yet.</p>}
+            {sortedGrievances.map(g => (
               <div key={g.id} className="glass-card flex items-start gap-md" style={{ borderLeft: g.status === 'resolved' ? '4px solid var(--success)' : '4px solid var(--cardinal)' }}>
                 <div className="text-center" style={{ minWidth: '60px' }}>
                   <button 
@@ -315,16 +337,12 @@ export default function Community() {
                     </div>
                   </div>
                   
-                  {item.status === 'resolved' ? (
-                    <button className="btn btn-block btn-sm" disabled style={{ background: 'var(--success)' }}>Item Resolved / Returned</button>
-                  ) : (
-                    <button 
-                      className="btn btn-block btn-sm btn-outline" 
-                      onClick={() => handleResolveLF(item.id)}
-                    >
-                      {item.reported_by === user.id ? 'Mark as Resolved' : 'I claim this / Contact Finder'}
-                    </button>
-                  )}
+                  <button
+                    className="btn btn-block btn-sm btn-outline"
+                    onClick={() => handleResolveLF(item.id)}
+                  >
+                    {item.reported_by === user.id || user.role === 'admin' ? 'Mark as Resolved' : 'I claim this / Contact Finder'}
+                  </button>
                 </div>
               </div>
             ))}
