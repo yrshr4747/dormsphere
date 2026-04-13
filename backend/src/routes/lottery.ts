@@ -58,7 +58,10 @@ router.get('/rank', authenticate, async (req: AuthRequest, res: Response) => {
       'SELECT rank, hash, seed, created_at FROM lottery_ranks WHERE student_id = $1 ORDER BY created_at DESC LIMIT 1',
       [req.user!.id],
     );
-    if (rows.length === 0) { res.status(404).json({ error: 'No lottery rank found.' }); return; }
+    if (rows.length === 0) {
+      res.json({ lottery: null });
+      return;
+    }
     res.json({ lottery: { rank: rows[0].rank, hash: rows[0].hash, seed: rows[0].seed, created_at: rows[0].created_at } });
   } catch (err) {
     console.error('Rank fetch error:', err);

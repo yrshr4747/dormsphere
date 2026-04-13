@@ -63,7 +63,10 @@ router.get('/match', authenticate, authorize('student'), async (req: AuthRequest
       ORDER BY m.created_at DESC LIMIT 1
     `, [req.user!.id]);
 
-    if (rows.length === 0) { res.status(404).json({ error: 'No match found yet.' }); return; }
+    if (rows.length === 0) {
+      res.json({ match: null });
+      return;
+    }
 
     const match = rows[0];
     const isA = match.student_a === req.user!.id;
@@ -172,7 +175,10 @@ router.get('/assignment', authenticate, async (req: AuthRequest, res: Response) 
       WHERE ra.student_id = $1
     `, [req.user!.id]);
 
-    if (rows.length === 0) { res.status(404).json({ error: 'No room assignment found.' }); return; }
+    if (rows.length === 0) {
+      res.json({ assignment: null });
+      return;
+    }
 
     const a = rows[0];
     res.json({

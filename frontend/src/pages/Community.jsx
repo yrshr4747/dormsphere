@@ -4,6 +4,7 @@ import useSocket from '../hooks/useSocket';
 
 export default function Community() {
   const [activeTab, setActiveTab] = useState('grievances'); // 'grievances' or 'lostfound'
+  const [featureError, setFeatureError] = useState('');
   
   // Grievance State
   const [grievances, setGrievances] = useState([]);
@@ -43,8 +44,15 @@ export default function Community() {
     try {
       const { data } = await api.get('/community/grievances');
       setGrievances(data.grievances);
+      setFeatureError('');
     } catch (err) {
       console.error(err);
+      const isMissingRoute = err.response?.status === 404;
+      setFeatureError(
+        isMissingRoute
+          ? 'Community routes are unavailable on the current backend deployment. Redeploy the backend service.'
+          : (err.response?.data?.error || 'Unable to load grievances right now.')
+      );
     }
   };
 
@@ -54,6 +62,12 @@ export default function Community() {
       setItems(data.items);
     } catch (err) {
       console.error(err);
+      const isMissingRoute = err.response?.status === 404;
+      setFeatureError(
+        isMissingRoute
+          ? 'Community routes are unavailable on the current backend deployment. Redeploy the backend service.'
+          : (err.response?.data?.error || 'Unable to load lost and found items right now.')
+      );
     }
   };
 
@@ -64,9 +78,15 @@ export default function Community() {
       await api.post('/community/grievances', gForm);
       setShowGrievanceForm(false);
       setGForm({ title: '', description: '', category: 'General', anonymous: false });
+      setFeatureError('');
       fetchGrievances();
     } catch (err) {
-      alert('Failed to post grievance');
+      const isMissingRoute = err.response?.status === 404;
+      alert(
+        isMissingRoute
+          ? 'Community posting is unavailable on the current backend deployment. Redeploy the backend service.'
+          : (err.response?.data?.error || 'Failed to post grievance')
+      );
     }
   };
 
@@ -108,9 +128,15 @@ export default function Community() {
       });
       setShowLFForm(false);
       setLFForm({ itemType: 'lost', title: '', description: '', location: '', image: null });
+      setFeatureError('');
       fetchLostFound();
     } catch (err) {
-      alert('Failed to post item');
+      const isMissingRoute = err.response?.status === 404;
+      alert(
+        isMissingRoute
+          ? 'Lost & found posting is unavailable on the current backend deployment. Redeploy the backend service.'
+          : (err.response?.data?.error || 'Failed to post item')
+      );
     }
   };
 
@@ -145,6 +171,11 @@ export default function Community() {
 
       {activeTab === 'grievances' && (
         <div className="animate-slide-up">
+          {featureError && (
+            <div className="glass-card mb-md" style={{ borderLeft: '4px solid var(--warning)' }}>
+              <p style={{ margin: 0 }}>{featureError}</p>
+            </div>
+          )}
           <div className="flex justify-between items-center mb-md">
             <h3 className="text-gold">Campus Grievances</h3>
             <button className="btn btn-outline" onClick={() => setShowGrievanceForm(!showGrievanceForm)}>
@@ -229,6 +260,11 @@ export default function Community() {
 
       {activeTab === 'lostfound' && (
         <div className="animate-slide-up">
+          {featureError && (
+            <div className="glass-card mb-md" style={{ borderLeft: '4px solid var(--warning)' }}>
+              <p style={{ margin: 0 }}>{featureError}</p>
+            </div>
+          )}
           <div className="flex justify-between items-center mb-md">
             <h3 className="text-gold">Lost & Found</h3>
             <button className="btn btn-outline" onClick={() => setShowLFForm(!showLFForm)}>
