@@ -12,7 +12,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     const { hostel } = req.query;
 
     let sql = `
-      SELECT m.id, m.media_type, m.url, m.caption, m.created_at,
+      SELECT m.id, m.media_type, m.url, m.caption, m.created_at, m.uploaded_by,
              h.code AS hostel_code, h.name AS hostel_name,
              s.name AS uploaded_by_name, s.roll_number
       FROM media m

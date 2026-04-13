@@ -3,6 +3,13 @@ import { query } from './connection';
 import { parseIdentity } from '../utils/parseIdentity';
 
 export async function seedDatabase(): Promise<void> {
+  await query(`
+    ALTER TABLE elections ADD COLUMN IF NOT EXISTS nomination_start TIMESTAMP;
+    ALTER TABLE elections ADD COLUMN IF NOT EXISTS nomination_end TIMESTAMP;
+    ALTER TABLE candidates ADD COLUMN IF NOT EXISTS cgpa DECIMAL(4,2);
+    ALTER TABLE candidates ADD COLUMN IF NOT EXISTS nomination_created_at TIMESTAMP DEFAULT NOW();
+  `);
+
   // Only seed hostels/students if the hostels table is empty
   const { rows } = await query('SELECT COUNT(*) AS cnt FROM hostels');
   const hostelsExist = parseInt(rows[0].cnt, 10) > 0;
@@ -163,7 +170,7 @@ export async function seedDatabase(): Promise<void> {
 
   // --- Sample Election ---
   await query(
-    "INSERT INTO elections (title, description, election_type, start_time, end_time, is_active) VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '7 days', true)",
+    "INSERT INTO elections (title, description, election_type, nomination_start, nomination_end, start_time, end_time, is_active) VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '2 days', NOW() + INTERVAL '3 days', NOW() + INTERVAL '10 days', true)",
     ['Block A Representative 2026', 'Elect your block representative for Spring 2026', 'block_rep'],
   );
 

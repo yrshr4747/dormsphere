@@ -203,18 +203,23 @@ CREATE TABLE elections (
     title VARCHAR(100) NOT NULL,
     description TEXT,
     election_type VARCHAR(30) NOT NULL CHECK (election_type IN ('block_rep', 'mess_committee', 'cultural', 'sports', 'general')),
+    nomination_start TIMESTAMP,
+    nomination_end TIMESTAMP,
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP NOT NULL,
     is_active BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW(),
-    CHECK (end_time > start_time)
+    CHECK (end_time > start_time),
+    CHECK (nomination_start IS NULL OR nomination_end IS NULL OR nomination_end > nomination_start)
 );
 
 CREATE TABLE candidates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     election_id UUID NOT NULL REFERENCES elections(id) ON DELETE CASCADE,
     student_id UUID NOT NULL REFERENCES students(id),
+    cgpa DECIMAL(4,2),
     manifesto TEXT,
+    nomination_created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE (election_id, student_id)
 );
 

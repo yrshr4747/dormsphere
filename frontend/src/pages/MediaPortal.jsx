@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 export default function MediaPortal() {
+  const user = JSON.parse(localStorage.getItem('dormsphere_user') || '{}');
   const [media, setMedia] = useState([]);
   const [selectedBlock, setSelectedBlock] = useState('all');
   const [uploadModal, setUploadModal] = useState(false);
@@ -124,6 +125,7 @@ export default function MediaPortal() {
         <div className="grid-3">
           {media.map((item) => {
             const color = blockColors[item.hostel_code] || '#8C1515';
+            const canDelete = user.role === 'admin' || item.uploaded_by === user.id;
             return (
               <div key={item.id} className="glass-card" style={{ overflow: 'hidden', position: 'relative' }}>
                 {/* Thumbnail */}
@@ -160,14 +162,16 @@ export default function MediaPortal() {
                   <p className="text-muted" style={{ fontSize: '0.75rem' }}>
                     {item.uploaded_by_name} • {formatDate(item.created_at)}
                   </p>
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => handleDelete(item.id)}
-                    title="Delete"
-                    style={{ padding: '2px 8px', fontSize: '0.8rem' }}
-                  >
-                    🗑️
-                  </button>
+                  {canDelete && (
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => handleDelete(item.id)}
+                      title="Delete"
+                      style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+                    >
+                      🗑️
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -6,6 +6,7 @@ export default function Outpass() {
   const user = JSON.parse(localStorage.getItem('dormsphere_user') || '{}');
   const isStudent = user.role === 'student';
   const [outpasses, setOutpasses] = useState([]);
+  const [activeOutpasses, setActiveOutpasses] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [qrData, setQrData] = useState(null);
   const [form, setForm] = useState({
@@ -19,7 +20,11 @@ export default function Outpass() {
   const [verifyResult, setVerifyResult] = useState(null);
 
   useEffect(() => {
-    if (isStudent) loadOutpasses();
+    if (isStudent) {
+      loadOutpasses();
+    } else {
+      loadActiveOutpasses();
+    }
   }, [isStudent]);
 
   const loadOutpasses = async () => {
@@ -31,12 +36,36 @@ export default function Outpass() {
     }
   };
 
+  const loadActiveOutpasses = async () => {
+    try {
+      const { data } = await api.get('/outpass/active');
+      setActiveOutpasses(data.outpasses || []);
+    } catch (err) {
+      console.error('Load active outpasses error:', err);
+    }
+  };
+
   const handleVerify = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       const { data } = await api.get(`/outpass/verify/${verifyToken.trim()}`);
       setVerifyResult(data);
+      loadActiveOutpasses();
+    } catch (err) {
+      setVerifyResult({ valid: false, error: err.response?.data?.error || 'Verification failed.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyToken = async (token) => {
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/outpass/verify/${token}`);
+      setVerifyToken(token);
+      setVerifyResult(data);
+      loadActiveOutpasses();
     } catch (err) {
       setVerifyResult({ valid: false, error: err.response?.data?.error || 'Verification failed.' });
     } finally {
@@ -152,30 +181,68 @@ export default function Outpass() {
 
       {/* Outpass History */}
       {!isStudent ? (
-        <div className="glass-card-static" style={{ maxWidth: 640 }}>
-          <h3 className="mb-lg">Verify Outpass</h3>
-          <form onSubmit={handleVerify}>
-            <div className="form-group">
-              <label className="form-label">QR Token</label>
-              <input className="form-input" value={verifyToken} onChange={(e) => setVerifyToken(e.target.value)} placeholder="Paste scanned token" required />
-            </div>
-            <button className="btn btn-cardinal" disabled={loading}>
-              {loading ? 'Verifying...' : 'Verify'}
-            </button>
-          </form>
-          {verifyResult && (
-            <div className="mt-lg" style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-md)', background: 'rgba(15,14,13,0.4)', border: '1px solid var(--border)' }}>
-              <p style={{ fontWeight: 700, color: verifyResult.valid ? 'var(--success-light)' : 'var(--danger)' }}>
-                {verifyResult.valid ? 'Valid Outpass' : 'Invalid Outpass'}
-              </p>
-              {verifyResult.outpass && (
-                <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: 'var(--space-sm)' }}>
-                  {verifyResult.outpass.student.name} • {verifyResult.outpass.student.roll_number} • {verifyResult.outpass.purpose}
+        <div className="grid-2">
+          <div className="glass-card-static">
+            <h3 className="mb-lg">Active Outpasses</h3>
+            {activeOutpasses.length === 0 ? (
+              <p className="text-muted">No active outpasses right now.</p>
+            ) : (
+              <div className="flex flex-col gap-md">
+                {activeOutpasses.map((op) => (
+                  <div
+                    key={op.id}
+                    style={{
+                      padding: 'var(--space-md) var(--space-lg)',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'rgba(15,14,13,0.4)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-md">
+                      <div>
+                        <p style={{ fontWeight: 700 }}>{op.name} • {op.roll_number}</p>
+                        <p className="text-muted" style={{ fontSize: '0.82rem' }}>
+                          {op.department} • {op.purpose}
+                        </p>
+                        <p className="text-muted" style={{ fontSize: '0.78rem', marginTop: '0.2rem' }}>
+                          Out: {new Date(op.out_time).toLocaleString()} • Return: {new Date(op.expected_return).toLocaleString()}
+                        </p>
+                      </div>
+                      <button className="btn btn-sm btn-cardinal" onClick={() => handleVerifyToken(op.qr_token)} disabled={loading}>
+                        Verify
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="glass-card-static">
+            <h3 className="mb-lg">Verify By Token</h3>
+            <form onSubmit={handleVerify}>
+              <div className="form-group">
+                <label className="form-label">QR Token</label>
+                <input className="form-input" value={verifyToken} onChange={(e) => setVerifyToken(e.target.value)} placeholder="Paste scanned token" required />
+              </div>
+              <button className="btn btn-cardinal" disabled={loading}>
+                {loading ? 'Verifying...' : 'Verify'}
+              </button>
+            </form>
+            {verifyResult && (
+              <div className="mt-lg" style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-md)', background: 'rgba(15,14,13,0.4)', border: '1px solid var(--border)' }}>
+                <p style={{ fontWeight: 700, color: verifyResult.valid ? 'var(--success-light)' : 'var(--danger)' }}>
+                  {verifyResult.valid ? 'Valid Outpass' : 'Invalid Outpass'}
                 </p>
-              )}
-              {verifyResult.error && <p className="text-muted" style={{ fontSize: '0.85rem' }}>{verifyResult.error}</p>}
-            </div>
-          )}
+                {verifyResult.outpass && (
+                  <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: 'var(--space-sm)' }}>
+                    {verifyResult.outpass.student.name} • {verifyResult.outpass.student.roll_number} • {verifyResult.outpass.purpose}
+                  </p>
+                )}
+                {verifyResult.error && <p className="text-muted" style={{ fontSize: '0.85rem' }}>{verifyResult.error}</p>}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="glass-card-static">

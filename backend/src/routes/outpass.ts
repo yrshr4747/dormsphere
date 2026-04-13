@@ -113,4 +113,23 @@ router.get('/my', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/outpass/active
+router.get('/active', authenticate, authorize('guard', 'admin', 'warden'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const { rows } = await query(`
+      SELECT o.id, o.qr_token, o.purpose, o.destination, o.out_time, o.expected_return, o.status, o.created_at,
+             s.name, s.roll_number, s.department
+      FROM outpasses o
+      JOIN students s ON s.id = o.student_id
+      WHERE o.status = 'active'
+      ORDER BY o.created_at DESC
+    `);
+
+    res.json({ outpasses: rows });
+  } catch (err) {
+    console.error('Active outpasses error:', err);
+    res.status(500).json({ error: 'Failed to fetch active outpasses.' });
+  }
+});
+
 export default router;
