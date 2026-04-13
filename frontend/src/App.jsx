@@ -5,6 +5,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import RoomArena from './pages/RoomArena';
 import Survey from './pages/Survey';
+import SurveyMatches from './pages/SurveyMatches';
 import Outpass from './pages/Outpass';
 import MediaPortal from './pages/MediaPortal';
 import Elections from './pages/Elections';
@@ -67,6 +68,11 @@ export default function App() {
                   <Route path="/survey" element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <Survey />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/survey-matches" element={
+                    <ProtectedRoute allowedRoles={['student']}>
+                      <SurveyMatches />
                     </ProtectedRoute>
                   } />
                   <Route path="/outpass" element={

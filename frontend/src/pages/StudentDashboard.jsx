@@ -250,7 +250,7 @@ export default function Dashboard() {
               </p>
             )}
             <p className="text-muted text-center" style={{ fontSize: '0.8rem', marginTop: 'var(--space-xs)' }}>
-              Check <Link to="/survey" className="text-cardinal">survey matches</Link> to find peers.
+              Check <Link to="/survey-matches" className="text-cardinal">survey matches</Link> to find peers.
             </p>
           </div>
         </div>

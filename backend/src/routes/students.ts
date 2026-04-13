@@ -88,6 +88,59 @@ router.get('/match', authenticate, authorize('student'), async (req: AuthRequest
   }
 });
 
+// GET /api/student/top-matches
+router.get('/top-matches', authenticate, authorize('student'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { rows: myRows } = await query(`
+      SELECT v.sleep, v.study, v.social, s.year_group
+      FROM vectors v
+      JOIN students s ON s.id = v.student_id
+      WHERE v.student_id = $1
+    `, [req.user!.id]);
+
+    if (myRows.length === 0) {
+      res.status(404).json({ error: 'Please complete the personality survey first.' });
+      return;
+    }
+
+    const me = myRows[0];
+    const myVector = {
+      sleep: parseFloat(me.sleep),
+      study: parseFloat(me.study),
+      social: parseFloat(me.social),
+    };
+
+    const { rows } = await query(`
+      SELECT v.student_id, v.sleep, v.study, v.social, s.name, s.roll_number, s.department
+      FROM vectors v
+      JOIN students s ON s.id = v.student_id
+      WHERE v.student_id != $1
+        AND s.year_group = $2
+        AND s.role = 'student'
+    `, [req.user!.id, me.year_group]);
+
+    const matches = rows
+      .map((row) => ({
+        id: row.student_id,
+        name: row.name,
+        rollNumber: row.roll_number,
+        department: row.department,
+        compatibilityScore: calculateCompatibility(myVector, {
+          sleep: parseFloat(row.sleep),
+          study: parseFloat(row.study),
+          social: parseFloat(row.social),
+        }),
+      }))
+      .sort((a, b) => b.compatibilityScore - a.compatibilityScore)
+      .slice(0, 5);
+
+    res.json({ matches });
+  } catch (err) {
+    console.error('Top matches error:', err);
+    res.status(500).json({ error: 'Failed to fetch survey matches.' });
+  }
+});
+
 // GET /api/student/compatibility/:targetId
 router.get('/compatibility/:targetId', authenticate, async (req: AuthRequest, res: Response) => {
   try {

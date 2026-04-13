@@ -169,7 +169,7 @@ export default function MVHRHostel() {
       <div style={styles.headerBanner}>
         <h1 style={styles.title}>MVHR Hall</h1>
         <ul style={styles.navTabs}>
-          {['General Information', 'Pictures and Floor Plans', 'Furnishings', 'Rates Chart'].map((tab) => {
+          {['General Information', 'Pictures and Floor Plans', 'Furnishings'].map((tab) => {
             const tabKey = tab.split(' ')[0].toLowerCase();
             return (
               <li 
@@ -286,43 +286,6 @@ export default function MVHRHostel() {
           </div>
         )}
 
-        {activeTab === 'rates' && (
-          <div className="animate-fade-in">
-            <h2 style={styles.sectionTitle}>Rates Chart (2025-2026)</h2>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#FFFFFF', border: '1px solid #D5D1C4' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#8C1515', color: '#FFFFFF' }}>
-                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Room Type</th>
-                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Autumn Quarter</th>
-                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Winter Quarter</th>
-                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Spring Quarter</th>
-                    <th style={{ padding: '1.5rem', textAlign: 'left' }}>Total Annual</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid #D5D1C4' }}>
-                    <td style={{ padding: '1.5rem', fontWeight: 'bold' }}>Standard Single</td>
-                    <td style={{ padding: '1.5rem' }}>$4,200</td>
-                    <td style={{ padding: '1.5rem' }}>$4,200</td>
-                    <td style={{ padding: '1.5rem' }}>$4,200</td>
-                    <td style={{ padding: '1.5rem', fontWeight: 'bold' }}>$12,600</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '1.5rem', fontWeight: 'bold' }}>Standard Double</td>
-                    <td style={{ padding: '1.5rem' }}>$3,600</td>
-                    <td style={{ padding: '1.5rem' }}>$3,600</td>
-                    <td style={{ padding: '1.5rem' }}>$3,600</td>
-                    <td style={{ padding: '1.5rem', fontWeight: 'bold' }}>$10,800</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p style={{ marginTop: '2rem', textAlign: 'center', color: '#6C757D' }}>
-              * Rates are subject to standard university approval processing and may vary based on financial aid packages.
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Footer */}
