@@ -9,6 +9,8 @@ function getRetentionKey(yearGroup: number) {
   return `retention_window_active_year_${yearGroup}`;
 }
 
+const RETENTION_SETTING_KEYS = RETENTION_ELIGIBLE_YEARS.map(getRetentionKey);
+
 // POST /api/admin/reset-lottery
 // Emergency Nuke feature. Only allowed for Chief Warden.
 router.post('/reset-lottery', authenticate, authorize('admin'), async (req: AuthRequest, res: Response) => {
@@ -40,6 +42,113 @@ router.post('/reset-lottery', authenticate, authorize('admin'), async (req: Auth
   } catch (err) {
     console.error('Master Reset Error:', err);
     res.status(500).json({ error: 'Failed to reset system data.' });
+  }
+});
+
+// POST /api/admin/academic-rollover
+// End-of-session rollover:
+// - snapshots current room into previous_room_id
+// - clears allocation cycle data
+// - promotes Years 1-4
+// - archives current Year 5 students out of allocation
+router.post('/academic-rollover', authenticate, authorize('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user!.designation !== 'Chief Warden') {
+      res.status(403).json({ error: 'Unauthorized: Only the Chief Warden can run academic rollover.' });
+      return;
+    }
+
+    const confirmText = String(req.body.confirmText || '').trim();
+    if (confirmText !== 'ROLL OVER') {
+      res.status(400).json({ error: "Confirmation text mismatch. Type 'ROLL OVER' to continue." });
+      return;
+    }
+
+    let promotedCount = 0;
+    let graduatedCount = 0;
+
+    await withTransaction(async (client) => {
+      const { rows: promotedRows } = await client.query(
+        `
+          UPDATE students s
+          SET previous_room_id = COALESCE(ra.room_id, s.previous_room_id),
+              year_group = CASE WHEN s.year_group BETWEEN 1 AND 4 THEN s.year_group + 1 ELSE s.year_group END,
+              year = CASE WHEN s.year BETWEEN 1 AND 4 THEN s.year + 1 ELSE s.year END,
+              retention_status = 'none',
+              updated_at = NOW()
+          FROM room_assignments ra
+          WHERE s.id = ra.student_id
+            AND s.role = 'student'
+            AND s.year_group BETWEEN 1 AND 4
+          RETURNING s.id
+        `
+      );
+      promotedCount += promotedRows.length;
+
+      const { rows: promotedWithoutRoomRows } = await client.query(
+        `
+          UPDATE students s
+          SET year_group = s.year_group + 1,
+              year = CASE WHEN s.year BETWEEN 1 AND 4 THEN s.year + 1 ELSE s.year END,
+              retention_status = 'none',
+              updated_at = NOW()
+          WHERE s.role = 'student'
+            AND s.year_group BETWEEN 1 AND 4
+            AND NOT EXISTS (SELECT 1 FROM room_assignments ra WHERE ra.student_id = s.id)
+          RETURNING s.id
+        `
+      );
+      promotedCount += promotedWithoutRoomRows.length;
+
+      const { rows: graduatedRows } = await client.query(
+        `
+          UPDATE students s
+          SET previous_room_id = NULL,
+              year_group = NULL,
+              year = NULL,
+              retention_status = 'released',
+              designation = 'Graduated Student',
+              updated_at = NOW()
+          WHERE s.role = 'student'
+            AND s.year_group = 5
+          RETURNING s.id
+        `
+      );
+      graduatedCount = graduatedRows.length;
+
+      await client.query('DELETE FROM room_assignments');
+      await client.query('DELETE FROM selection_attempts');
+      await client.query('DELETE FROM room_signals');
+      await client.query('DELETE FROM roommate_pairings');
+      await client.query('DELETE FROM room_interest');
+      await client.query('DELETE FROM lottery_ranks');
+      await client.query('DELETE FROM matches');
+
+      await client.query('UPDATE rooms SET occupied = 0, is_available = true');
+      await client.query("UPDATE waves SET is_active = false, status = 'pending'");
+      await client.query(
+        `UPDATE sys_settings
+         SET value = 'false', updated_at = NOW()
+         WHERE key = ANY($1::text[])`,
+        [[...RETENTION_SETTING_KEYS, 'retention_window_active']]
+      );
+    });
+
+    const message = `Academic rollover complete. Promoted ${promotedCount} continuing students, archived ${graduatedCount} final-year students, cleared allocation-cycle data, and reset all waves.`;
+    await query(
+      'INSERT INTO activity_logs (type, description) VALUES ($1, $2)',
+      ['ACADEMIC_ROLLOVER', `${req.user!.email}: ${message}`]
+    );
+
+    res.json({
+      success: true,
+      promotedCount,
+      graduatedCount,
+      message,
+    });
+  } catch (err) {
+    console.error('Academic rollover error:', err);
+    res.status(500).json({ error: 'Failed to complete academic rollover.' });
   }
 });
 

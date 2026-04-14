@@ -360,20 +360,35 @@ export default function AdminDashboard() {
         <p className="text-muted mb-md" style={{ fontSize: '0.85rem' }}>
           Restricted to Chief Warden only. Executing this will completely wipe all room assignments, roommates, and lottery states.
         </p>
-        <button 
-          className="btn" 
-          style={{ background: 'var(--danger)', color: 'white' }}
-          onClick={() => {
-            const confirmVal = prompt("Type 'I AGREE' to confirm completely wiping all data and resetting the lottery.");
-            if (confirmVal === 'I AGREE') {
-              api.post('/admin/reset-lottery')
-                .then(res => alert(res.data.message))
-                .catch(err => alert(err.response?.data?.error || 'Reset failed'));
-            }
-          }}
-        >
-          💥 CLEAR ALL DATA
-        </button>
+        <div className="flex gap-md" style={{ flexWrap: 'wrap' }}>
+          <button 
+            className="btn" 
+            style={{ background: 'var(--danger)', color: 'white' }}
+            onClick={() => {
+              const confirmVal = prompt("Type 'I AGREE' to confirm completely wiping all data and resetting the lottery.");
+              if (confirmVal === 'I AGREE') {
+                api.post('/admin/reset-lottery')
+                  .then(res => alert(res.data.message))
+                  .catch(err => alert(err.response?.data?.error || 'Reset failed'));
+              }
+            }}
+          >
+            💥 CLEAR ALL DATA
+          </button>
+          <button
+            className="btn btn-cardinal"
+            onClick={() => {
+              const confirmVal = prompt("Type 'ROLL OVER' to graduate current Year 5 students, promote continuing students, snapshot previous rooms, clear allocation-cycle data, and reset all waves.");
+              if (confirmVal === 'ROLL OVER') {
+                api.post('/admin/academic-rollover', { confirmText: confirmVal })
+                  .then(res => alert(res.data.message))
+                  .catch(err => alert(err.response?.data?.error || 'Academic rollover failed'));
+              }
+            }}
+          >
+            🎓 ACADEMIC ROLLOVER
+          </button>
+        </div>
       </div>
       {showSettings && <SettingsModal user={user} onClose={() => setShowSettings(false)} />}
     </div>
