@@ -254,56 +254,132 @@ router.post('/:id/attempt', authenticate, authorize('student', 'admin'), async (
     if (isAdmin) {
       console.log(`  🔑 ADMIN OVERRIDE: ${req.user!.rollNumber} bypassing all checks for room ${roomId}`);
 
-      // For admin: allow specifying a target student via body
-      const targetStudentId = req.body.student_id || studentId;
-      const result = await withTransaction(async (client) => {
-        const { rows: existingAssignment } = await client.query(
-          'SELECT room_id FROM room_assignments WHERE student_id = $1',
-          [targetStudentId],
-        );
-        const currentRoomId = existingAssignment[0]?.room_id || null;
+      const rawTargetStudentId = typeof req.body.student_id === 'string' ? req.body.student_id.trim() : '';
+      const rawRollNumber = typeof req.body.rollNumber === 'string' ? req.body.rollNumber.trim().toUpperCase() : '';
+      if (!rawTargetStudentId && !rawRollNumber) {
+        res.status(400).json({ error: 'Admin override requires a target student. Please provide a student roll number or student id.' });
+        return;
+      }
 
-        if (currentRoomId === roomId) {
-          const { rows: sameRoom } = await client.query(
-            'SELECT id, hostel_id, room_number, floor, capacity, occupied, is_available FROM rooms WHERE id = $1',
-            [roomId],
+      const targetLookup = rawTargetStudentId
+        ? await query(
+            'SELECT id, roll_number, year_group, role FROM students WHERE id = $1',
+            [rawTargetStudentId]
+          )
+        : await query(
+            'SELECT id, roll_number, year_group, role FROM students WHERE roll_number = $1',
+            [rawRollNumber]
           );
-          if (sameRoom.length === 0) throw new Error('Room not found.');
-          return { room: sameRoom[0], oldRoomId: null };
-        }
 
-        const { rows: updatedRoom } = await client.query(
-          `UPDATE rooms
-           SET occupied = occupied + 1,
-               is_available = CASE WHEN occupied + 1 >= capacity THEN false ELSE true END
-           WHERE id = $1 AND is_available = true AND occupied < capacity
-           RETURNING id, hostel_id, room_number, floor, capacity, occupied, is_available`,
+      if (targetLookup.rows.length === 0 || targetLookup.rows[0].role !== 'student') {
+        res.status(404).json({ error: 'Target student not found.' });
+        return;
+      }
+
+      const targetStudent = targetLookup.rows[0];
+      const { rows: pairRows } = await query(
+        `SELECT inviter_id, invitee_id
+         FROM roommate_pairings
+         WHERE (inviter_id = $1 OR invitee_id = $1) AND status = 'accepted'
+         LIMIT 1`,
+        [targetStudent.id]
+      );
+      const hasPartner = pairRows.length > 0;
+      const partnerId = hasPartner
+        ? (pairRows[0].inviter_id === targetStudent.id ? pairRows[0].invitee_id : pairRows[0].inviter_id)
+        : null;
+      const movePartner = hasPartner && partnerId
+        ? req.body.move_partner !== false
+        : false;
+      const studentsToAssign = hasPartner && partnerId && movePartner
+        ? [targetStudent.id, partnerId]
+        : [targetStudent.id];
+
+      const result = await withTransaction(async (client) => {
+        const { rows: roomRows } = await client.query(
+          'SELECT id, hostel_id, room_number, floor, capacity, occupied, is_available FROM rooms WHERE id = $1 FOR UPDATE',
           [roomId],
         );
+        if (roomRows.length === 0) {
+          throw new Error('Room not found.');
+        }
+        const targetRoom = roomRows[0];
 
-        if (updatedRoom.length === 0) {
-          const { rows: roomExists } = await client.query('SELECT id FROM rooms WHERE id = $1', [roomId]);
-          throw new Error(roomExists.length === 0 ? 'Room not found.' : 'Room is already full.');
+        if (hasPartner && movePartner && targetRoom.capacity < 2) {
+          throw new Error('Accepted roommate pairs can only be placed in double rooms.');
         }
 
-        if (currentRoomId) {
+        const { rows: existingAssignments } = await client.query(
+          'SELECT student_id, room_id FROM room_assignments WHERE student_id = ANY($1::uuid[])',
+          [studentsToAssign],
+        );
+        const oldRoomCounts = new Map<string, number>();
+        let occupantsAlreadyInTarget = 0;
+
+        existingAssignments.forEach((assignment: any) => {
+          if (assignment.room_id === roomId) {
+            occupantsAlreadyInTarget += 1;
+            return;
+          }
+          oldRoomCounts.set(assignment.room_id, (oldRoomCounts.get(assignment.room_id) || 0) + 1);
+        });
+
+        const additionalSlotsNeeded = studentsToAssign.length - occupantsAlreadyInTarget;
+        if (targetRoom.capacity - targetRoom.occupied < additionalSlotsNeeded) {
+          throw new Error('Room is already full.');
+        }
+
+        await client.query('DELETE FROM room_assignments WHERE student_id = ANY($1::uuid[])', [studentsToAssign]);
+
+        for (const [oldRoomId, count] of oldRoomCounts.entries()) {
           await client.query(
-            'UPDATE rooms SET occupied = GREATEST(occupied - 1, 0), is_available = true WHERE id = $1',
-            [currentRoomId],
+            `UPDATE rooms
+             SET occupied = GREATEST(occupied - $2, 0),
+                 is_available = true
+             WHERE id = $1`,
+            [oldRoomId, count],
           );
         }
 
-        await client.query('DELETE FROM room_assignments WHERE student_id = $1', [targetStudentId]);
-        await client.query(
-          'INSERT INTO room_assignments (student_id, room_id) VALUES ($1, $2)',
-          [targetStudentId, roomId],
-        );
-        await client.query(
-          "INSERT INTO selection_attempts (student_id, room_id, status, reason) VALUES ($1, $2, 'success', 'admin_override')",
-          [targetStudentId, roomId],
-        );
+        if (additionalSlotsNeeded > 0) {
+          const { rows: updatedRoomRows } = await client.query(
+            `UPDATE rooms
+             SET occupied = occupied + $2,
+                 is_available = CASE WHEN occupied + $2 >= capacity THEN false ELSE true END
+             WHERE id = $1
+             RETURNING id, hostel_id, room_number, floor, capacity, occupied, is_available`,
+            [roomId, additionalSlotsNeeded],
+          );
+          roomRows[0] = updatedRoomRows[0];
+        }
 
-        return { room: updatedRoom[0], oldRoomId: currentRoomId };
+        for (const sid of studentsToAssign) {
+          await client.query(
+            `INSERT INTO room_assignments (student_id, room_id)
+             VALUES ($1, $2)
+             ON CONFLICT (student_id) DO UPDATE SET room_id = $2, assigned_at = NOW()`,
+            [sid, roomId],
+          );
+          await client.query(
+            "INSERT INTO selection_attempts (student_id, room_id, status, reason) VALUES ($1, $2, 'success', 'admin_override')",
+            [sid, roomId],
+          );
+        }
+
+        if (hasPartner && partnerId && !movePartner) {
+          await client.query(
+            "UPDATE roommate_pairings SET status = 'cancelled', updated_at = NOW() WHERE (inviter_id = $1 AND invitee_id = $2) OR (inviter_id = $2 AND invitee_id = $1)",
+            [targetStudent.id, partnerId],
+          );
+        }
+
+        return {
+          room: roomRows[0],
+          movedStudents: studentsToAssign.length,
+          targetStudentId: targetStudent.id,
+          partnerId,
+          movePartner,
+        };
       });
 
       const room = result.room;
@@ -321,12 +397,24 @@ router.post('/:id/attempt', authenticate, authorize('student', 'admin'), async (
         lastAction: 'admin_override',
       });
 
-      console.log(`  🔑 Admin assigned room ${room.room_number} to ${targetStudentId}`);
+      console.log(`  🔑 Admin assigned room ${room.room_number} to ${result.targetStudentId}`);
       res.json({
         success: true,
-        message: '🔑 Room assigned via admin override.',
+        message: result.movedStudents > 1
+          ? '🔑 Room assigned via admin override for the accepted roommate pair.'
+          : result.partnerId && !result.movePartner
+          ? '🔑 Room assigned via admin override. The accepted roommate pairing was dissolved.'
+          : '🔑 Room assigned via admin override.',
         adminOverride: true,
-        assignment: { roomId: room.id, roomNumber: room.room_number, floor: room.floor, hostelId: hostel?.id, previousRoomId: result.oldRoomId },
+        assignment: {
+          roomId: room.id,
+          roomNumber: room.room_number,
+          floor: room.floor,
+          hostelId: hostel?.id,
+          movedStudents: result.movedStudents,
+          partnerId: result.partnerId,
+          movePartner: result.movePartner,
+        },
       });
       return;
     }
@@ -433,6 +521,21 @@ router.post('/:id/attempt', authenticate, authorize('student', 'admin'), async (
     const partnerId = hasPartner
       ? (partnerRows[0].inviter_id === studentId ? partnerRows[0].invitee_id : partnerRows[0].inviter_id)
       : null;
+
+    if (hasPartner && currentRoom.capacity < 2) {
+      res.status(403).json({ error: 'Accepted roommate pairs can only select double rooms.' });
+      return;
+    }
+    if (hasPartner && partnerId) {
+      const { rows: partnerAssignment } = await query(
+        'SELECT room_id FROM room_assignments WHERE student_id = $1',
+        [partnerId]
+      );
+      if (partnerAssignment.length > 0) {
+        res.status(409).json({ error: 'Your accepted roommate already has a room assignment, so your pair is already blocked from selecting another room.' });
+        return;
+      }
+    }
 
     // If we have a partner, we must book 2 slots atomically
     const occupancyIncrease = hasPartner ? 2 : 1;

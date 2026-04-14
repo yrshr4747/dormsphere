@@ -3,6 +3,11 @@ import { query, withTransaction } from '../db/connection';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+const RETENTION_ELIGIBLE_YEARS = [3, 4, 5];
+
+function getRetentionKey(yearGroup: number) {
+  return `retention_window_active_year_${yearGroup}`;
+}
 
 // POST /api/admin/reset-lottery
 // Emergency Nuke feature. Only allowed for Chief Warden.
@@ -147,6 +152,85 @@ router.get('/heatmap', authenticate, authorize('admin', 'warden'), async (req: A
   } catch (err) {
     console.error('Heatmap Fetch Error:', err);
     res.status(500).json({ error: 'Failed to generate heatmap data.' });
+  }
+});
+
+// GET /api/admin/students/search?q=...
+router.get('/students/search', authenticate, authorize('admin', 'warden'), async (req: AuthRequest, res: Response) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) {
+      res.json({ students: [] });
+      return;
+    }
+
+    const like = `%${q.toUpperCase()}%`;
+    const { rows } = await query(
+      `
+        SELECT
+          s.id,
+          s.roll_number,
+          s.name,
+          s.year_group,
+          s.department,
+          s.retention_status,
+          r.room_number AS current_room_number,
+          h.code AS current_hostel_code,
+          CASE
+            WHEN rp.id IS NULL THEN NULL
+            WHEN rp.inviter_id = s.id THEN partner.roll_number
+            ELSE inviter.roll_number
+          END AS partner_roll_number,
+          CASE
+            WHEN rp.id IS NULL THEN NULL
+            WHEN rp.inviter_id = s.id THEN partner.name
+            ELSE inviter.name
+          END AS partner_name
+        FROM students s
+        LEFT JOIN room_assignments ra ON ra.student_id = s.id
+        LEFT JOIN rooms r ON r.id = ra.room_id
+        LEFT JOIN hostels h ON h.id = r.hostel_id
+        LEFT JOIN roommate_pairings rp
+          ON (rp.inviter_id = s.id OR rp.invitee_id = s.id)
+         AND rp.status = 'accepted'
+        LEFT JOIN students inviter ON inviter.id = rp.inviter_id
+        LEFT JOIN students partner ON partner.id = rp.invitee_id
+        WHERE s.role = 'student'
+          AND (
+            UPPER(s.roll_number) LIKE $1
+            OR UPPER(s.name) LIKE $1
+          )
+        ORDER BY
+          CASE WHEN UPPER(s.roll_number) = UPPER($2) THEN 0 ELSE 1 END,
+          s.year_group DESC,
+          s.roll_number
+        LIMIT 10
+      `,
+      [like, q],
+    );
+
+    res.json({
+      students: rows.map((row: any) => ({
+        id: row.id,
+        rollNumber: row.roll_number,
+        name: row.name,
+        yearGroup: row.year_group,
+        department: row.department,
+        retentionStatus: row.retention_status,
+        currentRoom: row.current_room_number
+          ? `${row.current_hostel_code} ${row.current_room_number}`
+          : null,
+        partner: row.partner_roll_number
+          ? {
+              rollNumber: row.partner_roll_number,
+              name: row.partner_name,
+            }
+          : null,
+      })),
+    });
+  } catch (err) {
+    console.error('Admin student search error:', err);
+    res.status(500).json({ error: 'Failed to search students.' });
   }
 });
 
@@ -586,67 +670,101 @@ router.patch('/manual-allot', authenticate, authorize('admin'), async (req: Auth
     const partnerId = hasPair
       ? (pairRows[0].inviter_id === studentId ? pairRows[0].invitee_id : pairRows[0].inviter_id)
       : null;
+    const shouldMovePartner = hasPair && partnerId ? movePartner !== false : false;
+    const studentsToMove = hasPair && partnerId && shouldMovePartner ? [studentId, partnerId] : [studentId];
+    const slotsNeeded = studentsToMove.length;
 
-    // If paired and movePartner not specified, ask the caller
-    if (hasPair && movePartner === undefined) {
-      res.status(409).json({
-        error: 'This student has an accepted roommate pairing.',
-        partnerId,
-        question: 'Move partner too? Resend with movePartner: true or false.',
-        requiresDecision: true,
-      });
+    if (hasPair && shouldMovePartner && targetRoom.capacity < 2) {
+      res.status(409).json({ error: 'Accepted roommate pairs can only be placed in double rooms.' });
       return;
     }
-
-    const slotsNeeded = (hasPair && movePartner) ? 2 : 1;
     if (targetRoom.capacity - targetRoom.occupied < slotsNeeded) {
       res.status(409).json({ error: `Target room only has ${targetRoom.capacity - targetRoom.occupied} free bed(s), but ${slotsNeeded} needed.` });
       return;
     }
 
     await withTransaction(async (client) => {
-      // Remove existing assignment for the student
-      const { rows: oldAssignment } = await client.query('DELETE FROM room_assignments WHERE student_id = $1 RETURNING room_id', [studentId]);
-      if (oldAssignment.length > 0) {
-        await client.query('UPDATE rooms SET occupied = GREATEST(occupied - 1, 0), is_available = true WHERE id = $1', [oldAssignment[0].room_id]);
-      }
+      const { rows: existingAssignments } = await client.query(
+        'SELECT student_id, room_id FROM room_assignments WHERE student_id = ANY($1::uuid[])',
+        [studentsToMove]
+      );
+      const oldRoomCounts = new Map<string, number>();
+      let occupantsAlreadyInTarget = 0;
 
-      // Assign student to new room
-      await client.query('INSERT INTO room_assignments (student_id, room_id) VALUES ($1, $2) ON CONFLICT (student_id) DO UPDATE SET room_id = $2, assigned_at = NOW()', [studentId, roomId]);
-
-      if (hasPair && movePartner && partnerId) {
-        // Move partner too
-        const { rows: partnerOld } = await client.query('DELETE FROM room_assignments WHERE student_id = $1 RETURNING room_id', [partnerId]);
-        if (partnerOld.length > 0) {
-          await client.query('UPDATE rooms SET occupied = GREATEST(occupied - 1, 0), is_available = true WHERE id = $1', [partnerOld[0].room_id]);
+      existingAssignments.forEach((assignment: any) => {
+        if (assignment.room_id === roomId) {
+          occupantsAlreadyInTarget += 1;
+          return;
         }
-        await client.query('INSERT INTO room_assignments (student_id, room_id) VALUES ($1, $2) ON CONFLICT (student_id) DO UPDATE SET room_id = $2, assigned_at = NOW()', [partnerId, roomId]);
-      } else if (hasPair && !movePartner) {
-        // Dissolve the pairing
-        await client.query("UPDATE roommate_pairings SET status = 'cancelled', updated_at = NOW() WHERE id = $1", [pairRows[0].id]);
+        oldRoomCounts.set(assignment.room_id, (oldRoomCounts.get(assignment.room_id) || 0) + 1);
+      });
+
+      const additionalSlotsNeeded = studentsToMove.length - occupantsAlreadyInTarget;
+      if (additionalSlotsNeeded > 0) {
+        const { rows: lockedRoomRows } = await client.query(
+          'SELECT id, capacity, occupied FROM rooms WHERE id = $1 FOR UPDATE',
+          [roomId]
+        );
+        if (lockedRoomRows.length === 0) {
+          throw new Error('Target room not found.');
+        }
+        const lockedRoom = lockedRoomRows[0];
+        if (lockedRoom.capacity - lockedRoom.occupied < additionalSlotsNeeded) {
+          throw new Error(`Target room only has ${lockedRoom.capacity - lockedRoom.occupied} free bed(s), but ${additionalSlotsNeeded} additional bed(s) are needed.`);
+        }
       }
 
-      // Update target room occupancy
-      await client.query(`
-        UPDATE rooms SET occupied = occupied + $1,
-        is_available = CASE WHEN occupied + $1 >= capacity THEN false ELSE true END
-        WHERE id = $2
-      `, [slotsNeeded, roomId]);
+      await client.query('DELETE FROM room_assignments WHERE student_id = ANY($1::uuid[])', [studentsToMove]);
+
+      for (const [oldRoomId, count] of oldRoomCounts.entries()) {
+        await client.query(
+          `UPDATE rooms
+           SET occupied = GREATEST(occupied - $2, 0),
+               is_available = true
+           WHERE id = $1`,
+          [oldRoomId, count]
+        );
+      }
+
+      if (additionalSlotsNeeded > 0) {
+        await client.query(
+          `UPDATE rooms
+           SET occupied = occupied + $2,
+               is_available = CASE WHEN occupied + $2 >= capacity THEN false ELSE true END
+           WHERE id = $1`,
+          [roomId, additionalSlotsNeeded]
+        );
+      }
+
+      for (const sid of studentsToMove) {
+        await client.query(
+          `INSERT INTO room_assignments (student_id, room_id)
+           VALUES ($1, $2)
+           ON CONFLICT (student_id) DO UPDATE SET room_id = $2, assigned_at = NOW()`,
+          [sid, roomId]
+        );
+      }
+
+      if (hasPair && partnerId && !shouldMovePartner) {
+        await client.query(
+          "UPDATE roommate_pairings SET status = 'cancelled', updated_at = NOW() WHERE id = $1",
+          [pairRows[0].id]
+        );
+      }
     });
 
-    // Log
-    const description = hasPair && movePartner
-      ? `Manual override: Moved student ${studentId} + partner ${partnerId} to room ${targetRoom.room_number}`
-      : hasPair && !movePartner
-      ? `Manual override: Moved student ${studentId} to room ${targetRoom.room_number}. Pairing with ${partnerId} dissolved.`
-      : `Manual override: Moved student ${studentId} to room ${targetRoom.room_number}`;
+    const description = hasPair && partnerId && shouldMovePartner
+      ? `Manual override: moved paired students ${studentId} and ${partnerId} to room ${targetRoom.room_number}`
+      : hasPair && partnerId && !shouldMovePartner
+      ? `Manual override: moved student ${studentId} to room ${targetRoom.room_number} and dissolved pairing with ${partnerId}`
+      : `Manual override: moved student ${studentId} to room ${targetRoom.room_number}`;
 
     await query('INSERT INTO activity_logs (type, description) VALUES ($1, $2)', ['MANUAL_ALLOT', description]);
 
     res.json({
       success: true,
       message: description,
-      pairingDissolved: hasPair && !movePartner,
+      movedStudents: studentsToMove.length,
     });
 
   } catch (err) {
@@ -660,7 +778,26 @@ router.get('/settings', authenticate, authorize('admin', 'warden'), async (req: 
   try {
     const { rows } = await query('SELECT key, value FROM sys_settings');
     const settings = rows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
-    res.json({ settings });
+    const retention = RETENTION_ELIGIBLE_YEARS.reduce((acc, yearGroup) => ({
+      ...acc,
+      [yearGroup]: settings[getRetentionKey(yearGroup)] === 'true',
+    }), {} as Record<number, boolean>);
+    const anyRetentionOpen = Object.values(retention).some(Boolean);
+    settings.retention_window_active = anyRetentionOpen ? 'true' : 'false';
+    const { rows: waveRows } = await query(
+      `SELECT
+         EXISTS(
+           SELECT 1 FROM waves
+           WHERE gate_open <= NOW()
+              OR is_active = true
+              OR status IN ('active', 'completed')
+         ) AS any_wave_started`
+    );
+    res.json({
+      settings,
+      retention,
+      anyWaveStarted: waveRows[0]?.any_wave_started === true,
+    });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch settings' });
   }
@@ -673,13 +810,47 @@ router.post('/settings/retention', authenticate, authorize('admin'), async (req:
       res.status(403).json({ error: 'Unauthorized: Only Chief Warden can configure retention.' });
       return;
     }
-    const { active } = req.body;
+    const { active, yearGroup } = req.body;
+
+    if (!RETENTION_ELIGIBLE_YEARS.includes(Number(yearGroup))) {
+      res.status(400).json({ error: 'Retention can only be configured for Years 3, 4, and 5.' });
+      return;
+    }
+
+    if (active) {
+      const { rows: waveRows } = await query(
+        `SELECT EXISTS(
+           SELECT 1 FROM waves
+           WHERE gate_open <= NOW()
+              OR is_active = true
+              OR status IN ('active', 'completed')
+         ) AS any_wave_started`
+      );
+      if (waveRows[0]?.any_wave_started) {
+        res.status(409).json({ error: 'Retention can only be opened before any wave starts.' });
+        return;
+      }
+    }
+
+    const retentionKey = getRetentionKey(Number(yearGroup));
+    await query(
+      `INSERT INTO sys_settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+      [retentionKey, active ? 'true' : 'false']
+    );
+
+    const { rows: retentionRows } = await query(
+      'SELECT key, value FROM sys_settings WHERE key = ANY($1::text[])',
+      [RETENTION_ELIGIBLE_YEARS.map(getRetentionKey)]
+    );
+    const anyRetentionOpen = retentionRows.some((row: any) => row.value === 'true');
     await query(
       `INSERT INTO sys_settings (key, value) VALUES ('retention_window_active', $1)
        ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
-      [active ? 'true' : 'false']
+      [anyRetentionOpen ? 'true' : 'false']
     );
-    res.json({ message: `Retention window ${active ? 'activated' : 'deactivated'}.` });
+
+    res.json({ message: `Retention window for Year ${yearGroup} ${active ? 'activated' : 'deactivated'}.` });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update retention setting' });
   }
@@ -689,18 +860,41 @@ router.post('/settings/retention', authenticate, authorize('admin'), async (req:
 router.get('/export/allocations', authenticate, authorize('admin', 'warden'), async (req: AuthRequest, res: Response) => {
   try {
     const { rows } = await query(`
-      SELECT s.roll_number, s.name as student_name, s.department, s.year_group,
-             h.name as hostel_name, r.room_number, r.floor
-      FROM students s
-      JOIN room_assignments ra ON ra.student_id = s.id
-      JOIN rooms r ON ra.room_id = r.id
+      WITH ranked_occupants AS (
+        SELECT
+          ra.room_id,
+          s.roll_number,
+          s.name AS student_name,
+          s.department,
+          s.year_group,
+          ROW_NUMBER() OVER (PARTITION BY ra.room_id ORDER BY s.roll_number) AS occupant_rank
+        FROM room_assignments ra
+        JOIN students s ON s.id = ra.student_id
+      )
+      SELECT
+        h.name AS hostel_name,
+        r.room_number,
+        r.floor,
+        r.capacity,
+        r.occupied,
+        MAX(CASE WHEN ro.occupant_rank = 1 THEN ro.roll_number END) AS occupant_1_roll,
+        MAX(CASE WHEN ro.occupant_rank = 1 THEN ro.student_name END) AS occupant_1_name,
+        MAX(CASE WHEN ro.occupant_rank = 1 THEN ro.department END) AS occupant_1_department,
+        MAX(CASE WHEN ro.occupant_rank = 1 THEN ro.year_group END) AS occupant_1_year,
+        MAX(CASE WHEN ro.occupant_rank = 2 THEN ro.roll_number END) AS occupant_2_roll,
+        MAX(CASE WHEN ro.occupant_rank = 2 THEN ro.student_name END) AS occupant_2_name,
+        MAX(CASE WHEN ro.occupant_rank = 2 THEN ro.department END) AS occupant_2_department,
+        MAX(CASE WHEN ro.occupant_rank = 2 THEN ro.year_group END) AS occupant_2_year
+      FROM rooms r
       JOIN hostels h ON r.hostel_id = h.id
-      ORDER BY h.name, r.floor, r.room_number, s.year_group
+      JOIN ranked_occupants ro ON ro.room_id = r.id
+      GROUP BY h.name, r.room_number, r.floor, r.capacity, r.occupied
+      ORDER BY h.name, r.floor, r.room_number
     `);
 
-    let csv = 'Roll Number,Name,Department,Year,Hostel,Room,Floor\n';
+    let csv = 'Hostel,Room,Floor,Capacity,Occupied,Occupant 1 Roll,Occupant 1 Name,Occupant 1 Department,Occupant 1 Year,Occupant 2 Roll,Occupant 2 Name,Occupant 2 Department,Occupant 2 Year\n';
     rows.forEach((r: any) => {
-      csv += `"${r.roll_number}","${r.student_name}","${r.department}","${r.year_group}","${r.hostel_name}","${r.room_number}","${r.floor}"\n`;
+      csv += `"${r.hostel_name}","${r.room_number}","${r.floor}","${r.capacity}","${r.occupied}","${r.occupant_1_roll || ''}","${r.occupant_1_name || ''}","${r.occupant_1_department || ''}","${r.occupant_1_year || ''}","${r.occupant_2_roll || ''}","${r.occupant_2_name || ''}","${r.occupant_2_department || ''}","${r.occupant_2_year || ''}"\n`;
     });
 
     res.setHeader('Content-Type', 'text/csv');

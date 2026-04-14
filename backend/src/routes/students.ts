@@ -7,6 +7,7 @@ import { upload } from '../middleware/upload';
 import { uploadToCloudinary } from '../services/cloudinary';
 
 const router = Router();
+const getRetentionKey = (yearGroup: number) => `retention_window_active_year_${yearGroup}`;
 
 // POST /api/student/survey
 router.post('/survey', authenticate, authorize('student'), async (req: AuthRequest, res: Response) => {
@@ -195,10 +196,21 @@ router.get('/retention/status', authenticate, async (req: AuthRequest, res: Resp
       [req.user!.id]
     );
 
-    const { rows: settingRows } = await query("SELECT value FROM sys_settings WHERE key = 'retention_window_active'");
-    const retentionWindowActive = settingRows.length > 0 ? settingRows[0].value === 'true' : false;
-
     if (studentRows.length === 0) return res.status(404).json({ error: 'Student not found.' });
+    const yearGroup = studentRows[0].year_group;
+    const { rows: settingRows } = await query(
+      'SELECT value FROM sys_settings WHERE key = $1',
+      [getRetentionKey(yearGroup)]
+    );
+    const retentionWindowActive = settingRows.length > 0 ? settingRows[0].value === 'true' : false;
+    const { rows: waveRows } = await query(
+      `SELECT EXISTS(
+         SELECT 1 FROM waves
+         WHERE gate_open <= NOW()
+            OR is_active = true
+            OR status IN ('active', 'completed')
+       ) AS any_wave_started`
+    );
 
     let previousRoom = null;
     if (studentRows[0].previous_room_id) {
@@ -213,7 +225,8 @@ router.get('/retention/status', authenticate, async (req: AuthRequest, res: Resp
       retentionStatus: studentRows[0].retention_status,
       previousRoom,
       retentionWindowActive,
-      yearGroup: studentRows[0].year_group
+      yearGroup,
+      anyWaveStarted: waveRows[0]?.any_wave_started === true,
     });
   } catch (err) {
     console.error('Retention fetch error:', err);
@@ -233,7 +246,20 @@ router.post('/retention', authenticate, authorize('student'), async (req: AuthRe
     if (!student || student.year_group < 3) return res.status(403).json({ error: 'Not eligible for retention.' });
     if (student.retention_status !== 'none') return res.status(400).json({ error: 'Retention choice already made.' });
 
-    const { rows: settingRows } = await query("SELECT value FROM sys_settings WHERE key = 'retention_window_active'");
+    const { rows: waveRows } = await query(
+      `SELECT EXISTS(
+         SELECT 1 FROM waves
+         WHERE gate_open <= NOW()
+            OR is_active = true
+            OR status IN ('active', 'completed')
+       ) AS any_wave_started`
+    );
+    if (waveRows[0]?.any_wave_started) return res.status(403).json({ error: 'Retention is closed once any wave has started.' });
+
+    const { rows: settingRows } = await query(
+      'SELECT value FROM sys_settings WHERE key = $1',
+      [getRetentionKey(student.year_group)]
+    );
     if (!settingRows.length || settingRows[0].value !== 'true') return res.status(403).json({ error: 'Retention window is closed.' });
 
     if (action === 'release') {

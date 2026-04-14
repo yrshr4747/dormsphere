@@ -10,7 +10,8 @@ export default function AdminDashboard() {
   const [editingWave, setEditingWave] = useState(null);
   const [formData, setFormData] = useState({ gateOpen: '', gateClose: '' });
   const [feedback, setFeedback] = useState(null);
-  const [retentionActive, setRetentionActive] = useState(false);
+  const [retentionByYear, setRetentionByYear] = useState({ 3: false, 4: false, 5: false });
+  const [anyWaveStarted, setAnyWaveStarted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -21,7 +22,12 @@ export default function AdminDashboard() {
   const fetchSettings = async () => {
     try {
       const { data } = await api.get('/admin/settings');
-      setRetentionActive(data.settings?.retention_window_active === 'true');
+      setRetentionByYear({
+        3: data.retention?.[3] === true,
+        4: data.retention?.[4] === true,
+        5: data.retention?.[5] === true,
+      });
+      setAnyWaveStarted(data.anyWaveStarted === true);
     } catch (err) {
       console.error('Failed to load settings', err);
     }
@@ -56,6 +62,95 @@ export default function AdminDashboard() {
     } catch (err) {
       setFeedback({ type: 'fail', message: err.response?.data?.error || 'Failed to update.' });
     }
+  };
+
+  const getWaveState = (wave) => {
+    const now = new Date();
+    const start = new Date(wave.gate_open);
+    const end = new Date(wave.gate_close);
+
+    if (wave.status === 'completed' || end < now) {
+      return {
+        label: 'Closed',
+        badgeClass: 'badge-danger',
+        detail: `Closed on ${end.toLocaleString()}`,
+      };
+    }
+
+    if (wave.is_active && now >= start && now <= end) {
+      return {
+        label: 'Active',
+        badgeClass: 'badge-success',
+        detail: `Open until ${end.toLocaleString()}`,
+      };
+    }
+
+    if (start > now) {
+      return {
+        label: 'Scheduled',
+        badgeClass: 'badge-gold',
+        detail: `Opens on ${start.toLocaleString()}`,
+      };
+    }
+
+    if (wave.is_active && now < start) {
+      return {
+        label: 'Pre-Activated',
+        badgeClass: 'badge-gold',
+        detail: `Marked active, but opens on ${start.toLocaleString()}`,
+      };
+    }
+
+    return {
+      label: 'Pending',
+      badgeClass: 'badge-gold',
+      detail: `Waiting for activation or schedule update`,
+    };
+  };
+
+  const getRetentionExplanation = (yearGroup) => {
+    const wave = waves.find((entry) => Number(entry.year_group) === Number(yearGroup));
+    const waveState = wave ? getWaveState(wave) : null;
+
+    if (retentionByYear[yearGroup]) {
+      return {
+        tone: 'var(--success-light)',
+        text: `Year ${yearGroup} retention is open right now.`,
+      };
+    }
+
+    if (waveState?.label === 'Active') {
+      return {
+        tone: 'var(--warning)',
+        text: `Locked because the Year ${yearGroup} wave is active until ${new Date(wave.gate_close).toLocaleString()}.`,
+      };
+    }
+
+    if (waveState?.label === 'Closed') {
+      return {
+        tone: 'var(--danger)',
+        text: `Locked because the Year ${yearGroup} wave has already finished.`,
+      };
+    }
+
+    if (anyWaveStarted && wave?.gate_open) {
+      return {
+        tone: 'var(--warning)',
+        text: `Locked because a wave has already started. Year ${yearGroup} opens on ${new Date(wave.gate_open).toLocaleString()}.`,
+      };
+    }
+
+    if (wave?.gate_open) {
+      return {
+        tone: 'var(--light-gray)',
+        text: `Can be opened now. Year ${yearGroup} wave is scheduled for ${new Date(wave.gate_open).toLocaleString()}.`,
+      };
+    }
+
+    return {
+      tone: 'var(--light-gray)',
+      text: `No wave schedule found yet for Year ${yearGroup}.`,
+    };
   };
 
   return (
@@ -111,28 +206,60 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="glass-card-static mb-xl animate-slide-up flex justify-between items-center">
-        <div>
-          <h3 className="mb-sm">🕰️ Senior Retention Window</h3>
-          <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-            Allow 3rd, 4th, and 5th-year students to lock in their existing rooms before the wave race starts.
-          </p>
+      <div className="glass-card-static mb-xl animate-slide-up">
+        <div className="flex justify-between items-start" style={{ gap: 'var(--space-md)', flexWrap: 'wrap' }}>
+          <div>
+            <h3 className="mb-sm">🕰️ Senior Retention Windows</h3>
+            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+              Retention is now controlled year-wise. It can only be opened before any wave has started.
+            </p>
+            {anyWaveStarted && (
+              <p className="text-muted mt-sm" style={{ fontSize: '0.8rem', color: 'var(--warning)' }}>
+                At least one wave has already started, so no new retention window can be opened now.
+              </p>
+            )}
+          </div>
         </div>
-        <button 
-          className={`btn ${retentionActive ? 'btn-danger' : 'btn-success'}`}
-          onClick={async () => {
-             const newState = !retentionActive;
-             try {
-                await api.post('/admin/settings/retention', { active: newState });
-                setRetentionActive(newState);
-                alert(`Retention window correctly ${newState ? 'opened' : 'closed'}!`);
-             } catch(err) {
-                alert('Failed to update retention setting.');
-             }
-          }}
-        >
-          {retentionActive ? 'Close Retention Window' : 'Open Retention Window'}
-        </button>
+
+        <div className="grid-3 mt-lg">
+          {[5, 4, 3].map((yearGroup) => {
+            const isActive = retentionByYear[yearGroup];
+            const canOpen = !anyWaveStarted;
+            const explanation = getRetentionExplanation(yearGroup);
+            return (
+              <div key={yearGroup} className="glass-card-static">
+                <div className="flex items-center justify-between mb-sm">
+                  <h4>Year {yearGroup}</h4>
+                  <span className={`badge ${isActive ? 'badge-success' : 'badge-gold'}`}>
+                    {isActive ? 'Open' : 'Closed'}
+                  </span>
+                </div>
+                <p className="text-muted mb-md" style={{ fontSize: '0.8rem' }}>
+                  {yearGroup >= 3 ? 'Eligible seniors can retain their previous room.' : 'Retention is not available.'}
+                </p>
+                <p className="mb-md" style={{ fontSize: '0.78rem', color: explanation.tone }}>
+                  {explanation.text}
+                </p>
+                <button
+                  className={`btn btn-sm ${isActive ? 'btn-danger' : 'btn-success'}`}
+                  disabled={!isActive && !canOpen}
+                  onClick={async () => {
+                    const newState = !isActive;
+                    try {
+                      await api.post('/admin/settings/retention', { active: newState, yearGroup });
+                      await fetchSettings();
+                      alert(`Year ${yearGroup} retention window ${newState ? 'opened' : 'closed'} successfully.`);
+                    } catch (err) {
+                      alert(err.response?.data?.error || 'Failed to update retention setting.');
+                    }
+                  }}
+                >
+                  {isActive ? 'Close Retention' : 'Open Retention'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="glass-card-static mb-xl">
@@ -162,10 +289,7 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {waves.map((w) => {
-                  const now = new Date();
-                  const start = new Date(w.gate_open);
-                  const end = new Date(w.gate_close);
-                  const isActive = now >= start && now <= end && w.is_active;
+                  const waveState = getWaveState(w);
 
                   return (
                     <tr key={w.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -176,13 +300,12 @@ export default function AdminDashboard() {
                         {2026 - w.year_group}
                       </td>
                       <td style={{ padding: 'var(--space-md) var(--space-sm)' }}>
-                        {isActive ? (
-                          <span className="badge badge-success">Active</span>
-                        ) : end < now ? (
-                          <span className="badge badge-danger">Closed</span>
-                        ) : (
-                          <span className="badge badge-gold">Pending</span>
-                        )}
+                        <div className="flex flex-col gap-sm">
+                          <span className={`badge ${waveState.badgeClass}`}>{waveState.label}</span>
+                          <span className="text-muted" style={{ fontSize: '0.74rem' }}>
+                            {waveState.detail}
+                          </span>
+                        </div>
                       </td>
                       {editingWave === w.id ? (
                         <>
