@@ -11,7 +11,7 @@ export default function AdminDashboard() {
   const [formData, setFormData] = useState({ gateOpen: '', gateClose: '' });
   const [feedback, setFeedback] = useState(null);
   const [retentionByYear, setRetentionByYear] = useState({ 3: false, 4: false, 5: false });
-  const [anyWaveStarted, setAnyWaveStarted] = useState(false);
+  const [anyWaveOpen, setAnyWaveOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export default function AdminDashboard() {
         4: data.retention?.[4] === true,
         5: data.retention?.[5] === true,
       });
-      setAnyWaveStarted(data.anyWaveStarted === true);
+      setAnyWaveOpen(data.anyWaveOpen === true);
     } catch (err) {
       console.error('Failed to load settings', err);
     }
@@ -133,10 +133,10 @@ export default function AdminDashboard() {
       };
     }
 
-    if (anyWaveStarted && wave?.gate_open) {
+    if (anyWaveOpen && wave?.gate_open) {
       return {
         tone: 'var(--warning)',
-        text: `Locked because a wave has already started. Year ${yearGroup} opens on ${new Date(wave.gate_open).toLocaleString()}.`,
+        text: `Locked because a wave is currently open. Year ${yearGroup} opens on ${new Date(wave.gate_open).toLocaleString()}.`,
       };
     }
 
@@ -211,11 +211,11 @@ export default function AdminDashboard() {
           <div>
             <h3 className="mb-sm">🕰️ Senior Retention Windows</h3>
             <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-              Retention is now controlled year-wise. It can only be opened before any wave has started.
+              Retention is now controlled year-wise. It can be opened whenever all waves are closed.
             </p>
-            {anyWaveStarted && (
+            {anyWaveOpen && (
               <p className="text-muted mt-sm" style={{ fontSize: '0.8rem', color: 'var(--warning)' }}>
-                At least one wave has already started, so no new retention window can be opened now.
+                A wave is currently open, so no new retention window can be opened right now.
               </p>
             )}
           </div>
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
         <div className="grid-3 mt-lg">
           {[5, 4, 3].map((yearGroup) => {
             const isActive = retentionByYear[yearGroup];
-            const canOpen = !anyWaveStarted;
+            const canOpen = !anyWaveOpen;
             const explanation = getRetentionExplanation(yearGroup);
             return (
               <div key={yearGroup} className="glass-card-static">

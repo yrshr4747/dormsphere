@@ -206,10 +206,10 @@ router.get('/retention/status', authenticate, async (req: AuthRequest, res: Resp
     const { rows: waveRows } = await query(
       `SELECT EXISTS(
          SELECT 1 FROM waves
-         WHERE gate_open <= NOW()
-            OR is_active = true
-            OR status IN ('active', 'completed')
-       ) AS any_wave_started`
+         WHERE is_active = true
+           AND gate_open <= NOW()
+           AND gate_close > NOW()
+       ) AS any_wave_open`
     );
 
     let previousRoom = null;
@@ -226,7 +226,7 @@ router.get('/retention/status', authenticate, async (req: AuthRequest, res: Resp
       previousRoom,
       retentionWindowActive,
       yearGroup,
-      anyWaveStarted: waveRows[0]?.any_wave_started === true,
+      anyWaveOpen: waveRows[0]?.any_wave_open === true,
     });
   } catch (err) {
     console.error('Retention fetch error:', err);
@@ -249,12 +249,12 @@ router.post('/retention', authenticate, authorize('student'), async (req: AuthRe
     const { rows: waveRows } = await query(
       `SELECT EXISTS(
          SELECT 1 FROM waves
-         WHERE gate_open <= NOW()
-            OR is_active = true
-            OR status IN ('active', 'completed')
-       ) AS any_wave_started`
+         WHERE is_active = true
+           AND gate_open <= NOW()
+           AND gate_close > NOW()
+       ) AS any_wave_open`
     );
-    if (waveRows[0]?.any_wave_started) return res.status(403).json({ error: 'Retention is closed once any wave has started.' });
+    if (waveRows[0]?.any_wave_open) return res.status(403).json({ error: 'Retention is closed while a wave is open.' });
 
     const { rows: settingRows } = await query(
       'SELECT value FROM sys_settings WHERE key = $1',

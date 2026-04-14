@@ -788,15 +788,15 @@ router.get('/settings', authenticate, authorize('admin', 'warden'), async (req: 
       `SELECT
          EXISTS(
            SELECT 1 FROM waves
-           WHERE gate_open <= NOW()
-              OR is_active = true
-              OR status IN ('active', 'completed')
-         ) AS any_wave_started`
+           WHERE is_active = true
+             AND gate_open <= NOW()
+             AND gate_close > NOW()
+         ) AS any_wave_open`
     );
     res.json({
       settings,
       retention,
-      anyWaveStarted: waveRows[0]?.any_wave_started === true,
+      anyWaveOpen: waveRows[0]?.any_wave_open === true,
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch settings' });
@@ -821,13 +821,13 @@ router.post('/settings/retention', authenticate, authorize('admin'), async (req:
       const { rows: waveRows } = await query(
         `SELECT EXISTS(
            SELECT 1 FROM waves
-           WHERE gate_open <= NOW()
-              OR is_active = true
-              OR status IN ('active', 'completed')
-         ) AS any_wave_started`
+           WHERE is_active = true
+             AND gate_open <= NOW()
+             AND gate_close > NOW()
+         ) AS any_wave_open`
       );
-      if (waveRows[0]?.any_wave_started) {
-        res.status(409).json({ error: 'Retention can only be opened before any wave starts.' });
+      if (waveRows[0]?.any_wave_open) {
+        res.status(409).json({ error: 'Retention can only be opened while all waves are closed.' });
         return;
       }
     }
