@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 function roleHome(role) {
   if (role === 'student') return '/student/dashboard';
@@ -11,6 +12,7 @@ function roleHome(role) {
 
 export default function Login() {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState('login'); // 'login' | 'register' | 'otp'
   const [form, setForm] = useState({
     email: '',
@@ -138,12 +140,21 @@ export default function Login() {
       display: 'flex', 
       alignItems: 'center', 
       justifyContent: 'center',
-      background: 'linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7)), url("/login-bg.jpg")',
+      background: 'var(--login-hero-overlay), url("/login-bg.jpg")',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundAttachment: 'fixed'
     }}>
-      <div className="glass-card-static animate-slide-up" style={{ width: '100%', maxWidth: 440 }}>
+      <div className="glass-card-static animate-slide-up" style={{ width: '100%', maxWidth: 440, position: 'relative' }}>
+        <button
+          className="btn btn-ghost btn-sm"
+          type="button"
+          onClick={toggleTheme}
+          style={{ position: 'absolute', top: '1rem', right: '1rem' }}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        >
+          {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+        </button>
         {/* Header */}
         <div className="text-center mb-xl">
           <div style={{
@@ -236,7 +247,7 @@ export default function Login() {
           /* Login / Register View */
           <div>
             {/* Toggle */}
-            <div className="flex gap-sm mb-lg" style={{ background: 'rgba(15,14,13,0.4)', borderRadius: 'var(--radius-md)', padding: '4px' }}>
+            <div className="flex gap-sm mb-lg" style={{ background: 'var(--surface-muted)', borderRadius: 'var(--radius-md)', padding: '4px' }}>
               <button
                 className={`btn btn-sm w-full ${mode === 'login' ? 'btn-cardinal' : 'btn-ghost'}`}
                 style={{ border: 'none' }}

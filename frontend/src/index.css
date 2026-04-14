@@ -24,15 +24,6 @@
   --danger: #DC2626;
   --info: #3B82F6;
   
-  /* Dark Theme */
-  --bg-primary: #0F0E0D;
-  --bg-secondary: #1A1918;
-  --bg-card: rgba(46, 45, 41, 0.6);
-  --bg-glass: rgba(46, 45, 41, 0.35);
-  --bg-glass-hover: rgba(46, 45, 41, 0.55);
-  --border: rgba(155, 154, 151, 0.15);
-  --border-glow: rgba(140, 21, 21, 0.3);
-  
   /* Typography */
   --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-serif: 'Source Serif 4', Georgia, serif;
@@ -66,6 +57,67 @@
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+:root,
+[data-theme="dark"] {
+  --bg-primary: #0F0E0D;
+  --bg-secondary: #1A1918;
+  --bg-card: rgba(46, 45, 41, 0.6);
+  --bg-glass: rgba(46, 45, 41, 0.35);
+  --bg-glass-hover: rgba(46, 45, 41, 0.55);
+  --border: rgba(155, 154, 151, 0.15);
+  --border-glow: rgba(140, 21, 21, 0.3);
+  --text-primary: var(--sand);
+  --text-heading: var(--sand);
+  --text-inverse: #111111;
+  --nav-bg: rgba(15, 14, 13, 0.85);
+  --input-bg: rgba(15, 14, 13, 0.6);
+  --surface-muted: rgba(15, 14, 13, 0.4);
+  --surface-subtle: rgba(255, 255, 255, 0.04);
+  --hero-bg:
+    radial-gradient(circle at top left, rgba(212, 168, 67, 0.12), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(140, 21, 21, 0.18), transparent 40%),
+    rgba(26, 25, 24, 0.88);
+  --stat-card-bg: linear-gradient(180deg, rgba(46, 45, 41, 0.48), rgba(15, 14, 13, 0.68));
+  --infra-card-bg: rgba(15, 14, 13, 0.4);
+  --selection-overlay-bg: rgba(0, 0, 0, 0.7);
+  --bg-overlay-top: rgba(140, 21, 21, 0.08);
+  --bg-overlay-bottom: rgba(212, 168, 67, 0.05);
+  --login-hero-overlay: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7));
+}
+
+[data-theme="light"] {
+  --bg-primary: #f7f3eb;
+  --bg-secondary: #efe7db;
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --bg-glass: rgba(255, 255, 255, 0.68);
+  --bg-glass-hover: rgba(255, 255, 255, 0.9);
+  --border: rgba(94, 74, 56, 0.16);
+  --border-glow: rgba(140, 21, 21, 0.22);
+  --light-gray: #6f655d;
+  --text-primary: #241d18;
+  --text-heading: #241d18;
+  --text-inverse: #ffffff;
+  --nav-bg: rgba(247, 243, 235, 0.9);
+  --input-bg: rgba(255, 255, 255, 0.92);
+  --surface-muted: rgba(140, 121, 95, 0.12);
+  --surface-subtle: rgba(140, 21, 21, 0.07);
+  --hero-bg:
+    radial-gradient(circle at top left, rgba(212, 168, 67, 0.18), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(140, 21, 21, 0.14), transparent 42%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(244, 236, 225, 0.96));
+  --stat-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(239, 231, 219, 0.94));
+  --infra-card-bg: rgba(255, 255, 255, 0.72);
+  --selection-overlay-bg: rgba(80, 61, 45, 0.34);
+  --bg-overlay-top: rgba(140, 21, 21, 0.06);
+  --bg-overlay-bottom: rgba(212, 168, 67, 0.08);
+  --login-hero-overlay: linear-gradient(rgba(247, 243, 235, 0.78), rgba(239, 231, 219, 0.84));
+  --shadow-sm: 0 1px 3px rgba(73, 53, 36, 0.08);
+  --shadow-md: 0 10px 30px rgba(73, 53, 36, 0.12);
+  --shadow-lg: 0 18px 50px rgba(73, 53, 36, 0.14);
+  --shadow-glow: 0 0 20px rgba(140, 21, 21, 0.08);
+  --shadow-gold: 0 0 20px rgba(212, 168, 67, 0.12);
+}
+
 /* ---- Reset & Base ---- */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -82,10 +134,11 @@ html {
 body {
   font-family: var(--font-primary);
   background: var(--bg-primary);
-  color: var(--sand);
+  color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
+  transition: background var(--transition-base), color var(--transition-base);
 }
 
 body::before {
@@ -96,8 +149,8 @@ body::before {
   right: 0;
   bottom: 0;
   background: 
-    radial-gradient(ellipse at 20% 0%, rgba(140, 21, 21, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(212, 168, 67, 0.05) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 0%, var(--bg-overlay-top) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, var(--bg-overlay-bottom) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -120,7 +173,7 @@ a:hover {
 /* ---- Typography ---- */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-serif);
-  color: var(--sand);
+  color: var(--text-heading);
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
@@ -210,7 +263,7 @@ h4 { font-size: 1.25rem; font-weight: 600; }
 
 .btn-ghost {
   background: transparent;
-  color: var(--sand);
+  color: var(--text-primary);
   border: 1px solid var(--border);
 }
 
@@ -252,11 +305,11 @@ h4 { font-size: 1.25rem; font-weight: 600; }
 }
 
 .form-input {
-  background: rgba(15, 14, 13, 0.6);
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.875rem 1rem;
-  color: var(--sand);
+  color: var(--text-primary);
   font-family: var(--font-primary);
   font-size: 0.95rem;
   transition: all var(--transition-fast);
@@ -324,7 +377,7 @@ select.form-input {
 
 /* ---- Navbar ---- */
 .navbar {
-  background: rgba(15, 14, 13, 0.85);
+  background: var(--nav-bg);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
   padding: 0 var(--space-xl);
@@ -344,7 +397,7 @@ select.form-input {
   font-family: var(--font-serif);
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--sand);
+  color: var(--text-primary);
 }
 
 .navbar-brand-icon {
@@ -376,7 +429,7 @@ select.form-input {
 
 .navbar-link:hover,
 .navbar-link.active {
-  color: var(--sand);
+  color: var(--text-primary);
   background: var(--bg-glass);
 }
 
@@ -504,10 +557,7 @@ select.form-input {
   padding: var(--space-2xl);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  background:
-    radial-gradient(circle at top left, rgba(212, 168, 67, 0.12), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(140, 21, 21, 0.18), transparent 40%),
-    rgba(26, 25, 24, 0.88);
+  background: var(--hero-bg);
   box-shadow: var(--shadow-lg);
 }
 
@@ -564,7 +614,7 @@ select.form-input {
   padding: var(--space-lg);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(46, 45, 41, 0.48), rgba(15, 14, 13, 0.68));
+  background: var(--stat-card-bg);
 }
 
 .dashboard-stat-label {
@@ -576,7 +626,7 @@ select.form-input {
 }
 
 .dashboard-stat-value {
-  color: var(--sand);
+  color: var(--text-primary);
   font-size: 1.05rem;
   font-family: var(--font-serif);
   font-weight: 600;
@@ -616,7 +666,7 @@ select.form-input {
   font-size: 2rem;
   border-radius: 18px;
   margin-bottom: var(--space-lg);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-subtle);
 }
 
 .dashboard-panel {
@@ -642,7 +692,7 @@ select.form-input {
 .dashboard-infra-card {
   padding: var(--space-md);
   border-radius: var(--radius-md);
-  background: rgba(15, 14, 13, 0.4);
+  background: var(--infra-card-bg);
   border: 1px solid var(--border);
 }
 
@@ -697,7 +747,7 @@ select.form-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--selection-overlay-bg);
   backdrop-filter: blur(8px);
   z-index: 200;
   animation: fadeIn 0.2s ease;
@@ -954,4 +1004,51 @@ select.form-input {
   font-size: 0.75rem;
   color: var(--light-gray);
   font-weight: 400;
+}
+
+.theme-toggle {
+  min-width: 96px;
+}
+
+.theme-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.theme-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  text-align: left;
+  padding: var(--space-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.theme-option:hover,
+.theme-option.active {
+  border-color: var(--cardinal-light);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.theme-option-title {
+  font-weight: 700;
+  font-family: var(--font-serif);
+}
+
+.theme-option-copy {
+  color: var(--light-gray);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 720px) {
+  .theme-option-grid {
+    grid-template-columns: 1fr;
+  }
 }

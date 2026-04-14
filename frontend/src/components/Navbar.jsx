@@ -1,8 +1,10 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const user = JSON.parse(localStorage.getItem('dormsphere_user') || '{}');
 
   const handleLogout = () => {
@@ -42,6 +44,15 @@ export default function Navbar() {
       </ul>
 
       <div className="flex items-center gap-md">
+        <button
+          className="btn btn-ghost btn-sm theme-toggle"
+          onClick={toggleTheme}
+          type="button"
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        >
+          {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+        </button>
         <span className="badge badge-gold">{user.role || 'student'}</span>
         <span style={{ fontSize: '0.85rem', color: 'var(--light-gray)' }}>
           {user.name || 'User'}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 export default function SettingsModal({ user, onClose }) {
   const [activeTab, setActiveTab] = useState('profile');
@@ -13,6 +14,7 @@ export default function SettingsModal({ user, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const { theme, setTheme } = useTheme();
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -100,6 +102,13 @@ export default function SettingsModal({ user, onClose }) {
           >
             Password
           </button>
+          <button
+            className={`btn btn-sm ${activeTab === 'appearance' ? 'btn-cardinal' : 'btn-ghost'}`}
+            onClick={() => { setActiveTab('appearance'); setError(''); setSuccess(''); }}
+            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0' }}
+          >
+            Appearance
+          </button>
         </div>
 
         {error && <div style={{ color: '#f87171', marginBottom: '1rem', fontSize: '0.85rem' }}>{error}</div>}
@@ -159,6 +168,36 @@ export default function SettingsModal({ user, onClose }) {
             <button className="btn btn-cardinal w-full mt-sm" onClick={savePassword} disabled={loading}>
               {loading ? 'Changing Password...' : 'Change Password'}
             </button>
+          </div>
+        )}
+
+        {activeTab === 'appearance' && (
+          <div className="flex flex-col gap-md">
+            <div>
+              <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>Theme</h3>
+              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                Pick how DormSphere looks across the whole app. Your preference is saved on this device.
+              </p>
+            </div>
+
+            <div className="theme-option-grid">
+              <button
+                type="button"
+                className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
+                onClick={() => setTheme('dark')}
+              >
+                <span className="theme-option-title">Dark Mode</span>
+                <span className="theme-option-copy">Cinematic low-light dashboard with warm contrast.</span>
+              </button>
+              <button
+                type="button"
+                className={`theme-option ${theme === 'light' ? 'active' : ''}`}
+                onClick={() => setTheme('light')}
+              >
+                <span className="theme-option-title">Light Mode</span>
+                <span className="theme-option-copy">Bright paper-like layout for daytime usage.</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
