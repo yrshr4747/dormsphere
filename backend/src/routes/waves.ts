@@ -31,13 +31,52 @@ router.put('/:id', authenticate, authorize('admin'), async (req: AuthRequest, re
       return;
     }
 
-    const { rows } = await query(
-      `UPDATE waves 
-       SET gate_open = $1, gate_close = $2
-       WHERE id = $3 
-       RETURNING *`,
-      [gateOpen, gateClose, req.params.id]
+    const targetStart = new Date(gateOpen);
+    const targetEnd = new Date(gateClose);
+    const { rows: overlapRows } = await query(
+      `SELECT id, name, year_group
+       FROM waves
+       WHERE id <> $1
+         AND status <> 'completed'
+         AND gate_open < $3
+         AND gate_close > $2
+       LIMIT 1`,
+      [req.params.id, gateOpen, gateClose]
     );
+
+    if (overlapRows.length > 0) {
+      const overlappingWave = overlapRows[0];
+      res.status(409).json({
+        error: `Wave timings overlap with ${overlappingWave.name} (Year ${overlappingWave.year_group}). Only one wave can be open at a time.`,
+      });
+      return;
+    }
+
+    const now = new Date();
+    const waveStatus = targetEnd <= now ? 'completed' : 'pending';
+    const shouldBeActive = targetStart <= now && targetEnd > now;
+
+    const rows = await withTransaction(async (client) => {
+      if (shouldBeActive) {
+        await client.query(
+          "UPDATE waves SET is_active = false, status = CASE WHEN gate_close <= NOW() THEN 'completed' ELSE 'pending' END WHERE id <> $1",
+          [req.params.id]
+        );
+      }
+
+      const result = await client.query(
+        `UPDATE waves 
+         SET gate_open = $1,
+             gate_close = $2,
+             is_active = $3,
+             status = $4
+         WHERE id = $5 
+         RETURNING *`,
+        [gateOpen, gateClose, shouldBeActive, waveStatus, req.params.id]
+      );
+
+      return result.rows;
+    });
 
     if (rows.length === 0) {
       res.status(404).json({ error: 'Wave not found.' });
