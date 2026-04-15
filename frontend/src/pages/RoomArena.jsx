@@ -302,7 +302,12 @@ export default function RoomArena() {
                       </div>
                       {student.partner && (
                         <div className="text-muted mt-sm" style={{ fontSize: '0.78rem' }}>
-                          Roommate: {student.partner.rollNumber} ({student.partner.name})
+                          Accepted roommate: {student.partner.rollNumber} ({student.partner.name})
+                        </div>
+                      )}
+                      {!student.partner && student.currentRoommate && (
+                        <div className="text-muted mt-sm" style={{ fontSize: '0.78rem' }}>
+                          Current roommate: {student.currentRoommate.rollNumber} ({student.currentRoommate.name})
                         </div>
                       )}
                     </button>
@@ -334,6 +339,16 @@ export default function RoomArena() {
                       </div>
                       <div className="text-muted mt-sm">
                         You will choose whether to move both students together or move only this student.
+                      </div>
+                    </div>
+                  ) : selectedStudent.currentRoommate ? (
+                    <div className="mt-md" style={{ fontSize: '0.82rem' }}>
+                      <strong>Current roommate</strong>
+                      <div className="text-muted mt-sm">
+                        {selectedStudent.currentRoommate.rollNumber} • {selectedStudent.currentRoommate.name}
+                      </div>
+                      <div className="text-muted mt-sm">
+                        This student shares a room currently, but there is no accepted roommate-pair record linked for automatic pair movement.
                       </div>
                     </div>
                   ) : (

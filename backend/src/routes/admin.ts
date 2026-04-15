@@ -294,7 +294,9 @@ router.get('/students/search', authenticate, authorize('admin', 'warden'), async
             WHEN rp.id IS NULL THEN NULL
             WHEN rp.inviter_id = s.id THEN partner.name
             ELSE inviter.name
-          END AS partner_name
+          END AS partner_name,
+          roommate.roll_number AS current_roommate_roll_number,
+          roommate.name AS current_roommate_name
         FROM students s
         LEFT JOIN room_assignments ra ON ra.student_id = s.id
         LEFT JOIN rooms r ON r.id = ra.room_id
@@ -304,6 +306,10 @@ router.get('/students/search', authenticate, authorize('admin', 'warden'), async
          AND rp.status = 'accepted'
         LEFT JOIN students inviter ON inviter.id = rp.inviter_id
         LEFT JOIN students partner ON partner.id = rp.invitee_id
+        LEFT JOIN room_assignments roommate_ra
+          ON roommate_ra.room_id = ra.room_id
+         AND roommate_ra.student_id <> s.id
+        LEFT JOIN students roommate ON roommate.id = roommate_ra.student_id
         WHERE s.role = 'student'
           AND (
             UPPER(s.roll_number) LIKE $1
@@ -333,6 +339,12 @@ router.get('/students/search', authenticate, authorize('admin', 'warden'), async
           ? {
               rollNumber: row.partner_roll_number,
               name: row.partner_name,
+            }
+          : null,
+        currentRoommate: !row.partner_roll_number && row.current_roommate_roll_number
+          ? {
+              rollNumber: row.current_roommate_roll_number,
+              name: row.current_roommate_name,
             }
           : null,
       })),
