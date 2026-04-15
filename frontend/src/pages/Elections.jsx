@@ -274,10 +274,10 @@ export default function Elections() {
                 <label className="form-label">Eligible Department</label>
                 <select className="form-input" value={createForm.eligibleDepartment} onChange={(e) => setCreateForm({ ...createForm, eligibleDepartment: e.target.value })}>
                   <option value="">All Departments</option>
-                  <option value="Computer Science">Computer Science</option>
-                  <option value="Electronics & Communication">Electronics & Communication</option>
-                  <option value="Mechanical Engineering">Mechanical Engineering</option>
-                  <option value="Artificial Intelligence & Data Science">Artificial Intelligence & Data Science</option>
+                  <option value="CSE">Computer Science</option>
+                  <option value="ECE">Electronics & Communication</option>
+                  <option value="Mechanical">Mechanical Engineering</option>
+                  <option value="AI & DS">Artificial Intelligence & Data Science</option>
                 </select>
               </div>
               <div className="form-group">
@@ -424,10 +424,10 @@ export default function Elections() {
                     <label className="form-label">Eligible Department</label>
                     <select className="form-input" value={editForm.eligibleDepartment} onChange={(e) => setEditForm({ ...editForm, eligibleDepartment: e.target.value })}>
                       <option value="">All Departments</option>
-                      <option value="Computer Science">Computer Science</option>
-                      <option value="Electronics & Communication">Electronics & Communication</option>
-                      <option value="Mechanical Engineering">Mechanical Engineering</option>
-                      <option value="Artificial Intelligence & Data Science">Artificial Intelligence & Data Science</option>
+                      <option value="CSE">Computer Science</option>
+                      <option value="ECE">Electronics & Communication</option>
+                      <option value="Mechanical">Mechanical Engineering</option>
+                      <option value="AI & DS">Artificial Intelligence & Data Science</option>
                     </select>
                   </div>
                   <div className="form-group">

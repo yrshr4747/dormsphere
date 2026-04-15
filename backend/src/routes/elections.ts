@@ -4,6 +4,28 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+const DEPARTMENT_ALIASES: Record<string, string> = {
+  'computer science': 'CSE',
+  'computer science and engineering': 'CSE',
+  cse: 'CSE',
+  'electronics & communication': 'ECE',
+  'electronics and communication': 'ECE',
+  ece: 'ECE',
+  mechanical: 'Mechanical',
+  'mechanical engineering': 'Mechanical',
+  'ai & ds': 'AI & DS',
+  'ai and ds': 'AI & DS',
+  'artificial intelligence & data science': 'AI & DS',
+  'artificial intelligence and data science': 'AI & DS',
+};
+
+function normalizeDepartment(value?: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return DEPARTMENT_ALIASES[trimmed.toLowerCase()] || trimmed;
+}
+
 async function getStudentElectionProfile(studentId: string) {
   const { rows } = await query(`
     SELECT s.id, s.year_group, s.department, h.code AS hostel_code
@@ -22,8 +44,10 @@ function getEligibilityFailure(election: any, student: any, cgpa?: number | null
   if (election.eligible_year_group && student.year_group !== election.eligible_year_group) {
     return `Only Year ${election.eligible_year_group} students are eligible for this election.`;
   }
-  if (election.eligible_department && student.department !== election.eligible_department) {
-    return `Only ${election.eligible_department} students are eligible for this election.`;
+  const normalizedStudentDepartment = normalizeDepartment(student.department);
+  const normalizedEligibleDepartment = normalizeDepartment(election.eligible_department);
+  if (normalizedEligibleDepartment && normalizedStudentDepartment !== normalizedEligibleDepartment) {
+    return `Only ${normalizedEligibleDepartment} students are eligible for this election.`;
   }
   if (election.eligible_hostel_code && student.hostel_code !== election.eligible_hostel_code) {
     return `Only students from ${election.eligible_hostel_code} are eligible for this election.`;
@@ -136,6 +160,8 @@ router.post('/', authenticate, authorize('admin'), async (req: AuthRequest, res:
       return;
     }
 
+    const normalizedEligibleDepartment = normalizeDepartment(eligibleDepartment);
+
     const { rows } = await query(`
       INSERT INTO elections (title, description, election_type, eligible_year_group, eligible_hostel_code, eligible_department, min_cgpa, nomination_start, nomination_end, start_time, end_time, is_active)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)
@@ -146,7 +172,7 @@ router.post('/', authenticate, authorize('admin'), async (req: AuthRequest, res:
       electionType,
       eligibleYearGroup || null,
       eligibleHostelCode || null,
-      eligibleDepartment || null,
+      normalizedEligibleDepartment,
       minCgpaValue,
       nominationStartDate,
       nominationEndDate,
@@ -198,6 +224,8 @@ router.patch('/:id', authenticate, authorize('admin'), async (req: AuthRequest, 
       return;
     }
 
+    const normalizedEligibleDepartment = normalizeDepartment(eligibleDepartment);
+
     await query(
       `UPDATE elections
        SET eligible_year_group = $1, eligible_hostel_code = $2, eligible_department = $3, min_cgpa = $4,
@@ -206,7 +234,7 @@ router.patch('/:id', authenticate, authorize('admin'), async (req: AuthRequest, 
       [
         eligibleYearGroup || null,
         eligibleHostelCode || null,
-        eligibleDepartment || null,
+        normalizedEligibleDepartment,
         minCgpaValue,
         nominationStartDate,
         nominationEndDate,
